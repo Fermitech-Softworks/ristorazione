@@ -1,0 +1,50 @@
+.default-navbar {
+    background-color: #ff6f00;
+    padding: 0px 10px;
+    position: relative;
+}
+
+.default-jumbotron h1 {
+    margin-top: 1rem;
+}
+
+.default-jumbotron {
+    padding: 2rem 2rem;
+    margin-bottom: 2rem;
+    background-color: #ff6f00;
+    border-radius: .5rem;
+    box-sizing: inherit;
+    opacity: 1;
+    box-shadow: 10px 10px #bdbdbd;
+    border-bottom-width: 10px;
+    border-bottom-style: solid;
+    border-bottom-color: #ffb74d;
+}
+
+.outlined-jumbotron {
+    padding: 2rem 2rem;
+    margin-bottom: 2rem;
+    background-color: #fafafa;
+    border: 4px solid #ff6f00 !important;
+    border-radius: .5rem;
+    box-sizing: inherit;
+    opacity: 1;
+    box-shadow: 10px 10px #bdbdbd;
+}
+
+.default-footer {
+    color: #fafafa;
+    background-color: #ff6f00;
+    border-radius: .5rem;
+    box-shadow: 10px 10px #bdbdbd;
+    padding: 2rem 2rem;
+}
+
+.default-footer .container{
+    width: 100%;
+}
+
+.default-jumbotron-content {
+    opacity: 1;
+    color: #fafafa;
+}

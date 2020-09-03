@@ -229,4 +229,4 @@ if __name__ == "__main__":
         newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", type=3, password=ash)
         db.session.add(newUser)
         db.session.commit()
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
