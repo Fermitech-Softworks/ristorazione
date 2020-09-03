@@ -6,3 +6,4 @@ static/*.doc
 static/*.docx
 venv/
 __pycache__/
+.idea/
