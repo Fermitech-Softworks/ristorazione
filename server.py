@@ -116,6 +116,7 @@ class Plate(db.Model):
 # UTILITIES
 
 class UserType(IntEnum):
+    undefined = 0
     waiter = 1
     owner = 2
     platformAdmin = 3
@@ -169,7 +170,7 @@ def login_or_redirect(f):
     @functools.wraps(f)
     def func(*args, **kwargs):
         if not session.get("email"):
-            return redirect(url_for('page_dashboard'))
+            return redirect(url_for('page_home'))
         return f(*args, **kwargs)
 
     return func
@@ -183,24 +184,24 @@ def get_locale():
 # Error pages with cats
 
 
-@app.errorhandler(400)
-def page_400(_):
-    return render_template('error.htm', e=400), 400
-
-
-@app.errorhandler(403)
-def page_403(_):
-    return render_template('error.htm', e=403), 403
-
-
-@app.errorhandler(404)
-def page_404(_):
-    return render_template('error.htm', e=404), 404
-
-
-@app.errorhandler(500)
-def page_500(_):
-    return render_template('error.htm', e=500), 500
+#@app.errorhandler(400)
+#def page_400(_):
+#    return render_template('error.htm', e=400), 400
+#
+#
+#@app.errorhandler(403)
+#def page_403(_):
+#    return render_template('error.htm', e=403), 403
+#
+#
+#@app.errorhandler(404)
+#def page_404(_):
+#    return render_template('error.htm', e=404), 404
+#
+#
+#@app.errorhandler(500)
+#def page_500(_):
+#    return render_template('error.htm', e=500), 500
 
 
 # Pages for the guests
@@ -208,14 +209,53 @@ def page_500(_):
 
 @app.route('/')
 @login_or_redirect
+def page_root():
+    del session['email']
+    return redirect(url_for('page_home'))
+
+
+@app.route('/home')
 def page_home():
-    del session['username']
-    return redirect(url_for('page_dashboard'))
+    return render_template("home.htm")
 
 
-@app.route('/dashboard')
+@app.route('/login', methods=['GET', 'POST'])
+def page_login():
+    if request.method == 'GET':
+        return render_template("login.htm", invert=True)
+    email = request.form.get("email")
+    password = request.form.get("password")
+    if not email or not password:
+        abort(400)
+        return
+    if login(email, password):
+        session['email'] = email
+        return redirect(url_for('page_dashboard'))
+    else:
+        abort(403)
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def page_register():
+    if request.method == 'GET':
+        return render_template("register.htm", invert=True)
+    name = request.form.get("email")
+    surname = request.form.get("surname")
+    email = request.form.get("email")
+    password = request.form.get("password")
+    p = bytes(password, encoding="utf-8")
+    ash = bcrypt.hashpw(p, bcrypt.gensalt())
+    newUser = User(name=name, surname=surname, email=email, password=ash, type=UserType.undefined)
+    db.session.add(newUser)
+    db.session.commit()
+    return redirect(url_for('page_login'))
+
+
+@app.route("/dashboard")
+@login_or_403
 def page_dashboard():
-    return render_template("dashboard.htm")
+    user = find_user(session['email'])
+    return render_template("dashboard.htm", user=user)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@
     {% block extrahead %}
     {% endblock %}
 </head>
-<body>
+<body {% if invert is defined %}style="background-color: #ff6f00"{% endif %}>
 {% include 'nav.htm' %}
 <br>
 <div class="container">

@@ -1,22 +1,35 @@
 <nav class="default-navbar">
     <div class="nav-wrapper">
-        <a href="#" class="brand-logo">Ristorazione</a>
+        <a href="{% if user is defined %}/dashboard{% else %}/home{% endif %}" class="brand-logo">Ristorazione</a>
         <a href="#" class="sidenav-trigger" data-target="mobile-nav">
             <i class="material-icons">menu</i>
         </a>
+
         <ul class="right hide-on-med-and-down ">
-            <li><a href="#">{{ gettext("About this software") }}</a></li>
-            <li><a href="#">{{ gettext("Register") }}</a></li>
-            <li><a style="background: white; color: #ff6f00; border-radius:5px" href="#">{{ gettext("Login") }}</a></li>
+            {% if user is defined %}
+                <li><a style="background: white; color: #ff6f00; border-radius:5px"
+                       href="/">{{ gettext("Logout") }}</a></li>
+            {% else %}
+                <li><a href="#">{{ gettext("About this software") }}</a></li>
+                <li><a href="/register">{{ gettext("Register") }}</a></li>
+                <li><a style="background: white; color: #ff6f00; border-radius:5px"
+                       href="/login">{{ gettext("Login") }}</a></li>
+            {% endif %}
         </ul>
+
     </div>
 </nav>
 
-<ul class="sidenav" id="mobile-nav">
-    <li><a href="#">Ristorazione</a></li>
-    <li><a href="#">{{ gettext("About this software") }}</a></li>
-    <li><a href="#">{{ gettext("Register") }}</a></li>
-    <li><a href="#">{{ gettext("Login") }}</a></li>
+<ul class="sidenav" id="mobile-nav" style="background-color: #ff6f00; color:#fafafa">
+    {% if user is defined %}
+        <li><a style="background: white; color: #ff6f00; border-radius:5px"
+               href="/">{{ gettext("Logout") }}</a></li>
+    {% else %}
+        <li><a href="#">Ristorazione</a></li>
+        <li><a href="#">{{ gettext("About this software") }}</a></li>
+        <li><a href="/register">{{ gettext("Register") }}</a></li>
+        <li><a href="/login" style="background-color: #fafafa; color: #ff6f00">{{ gettext("Login") }}</a></li>
+    {% endif %}
 </ul>
 <script>
     $(document).ready(function () {
