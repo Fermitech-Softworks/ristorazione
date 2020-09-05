@@ -1,1 +1,18 @@
-<h1>Error</h1>
+{% extends "stampo.htm" %}
+{% block title %}Error{% endblock %}
+{% block content %}
+    <div style="color: #fafafa">
+        <h1>{{ e }}</h1>
+        <blockquote>
+            {% if e==400 %}
+                {{ gettext("There's an issue with the previous page. Please check you have filled all the fields in the previous form.") }}
+            {% elif e==403 %}
+                {{ gettext("You are not authorized. You are either not logged in or you're trying to do something you're not supposed to.") }}
+            {% elif e==404 %}
+                {{ gettext("The resource you are trying to access was hidden or deleted. Either way, you cannot access it.") }}
+            {% elif e==500 %}
+                {{ gettext("The server messed up handling your request. If this keeps happening, write an assistance ticket.") }}
+            {% endif %}
+        </blockquote>
+    </div>
+{% endblock %}

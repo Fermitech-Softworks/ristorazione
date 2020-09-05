@@ -1,0 +1,22 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("List of restaurants") }}{% endblock %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function () {
+            $('.collapsible').collapsible();
+        });
+    </script>
+{% endblock %}
+{% block content %}
+    <div style="color: #fafafa">
+        <h2>{% if mode == "search" %}{{ gettext("Here's the result of the search:") }}{% endif %}</h2>
+    </div>
+    <ul class="collapsible">
+        {% for restaurant in restaurants %}
+            <li>
+                <div class="collapsible-header">{{ restaurant[0].name }}</div>
+                <div class="collapsible-body"><span>Lorem ipsum dolor sit amet.</span></div>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

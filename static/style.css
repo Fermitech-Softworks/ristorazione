@@ -58,6 +58,44 @@
     padding: 2rem 2rem;
 }
 
+.tabs .tab a {
+    background-color: #ff6f00;
+    color: #fafafa;
+}
+
+.tab a.active {
+    color: #ff6f00;
+}
+
+.tab a.selected {
+    color: #ff6f00;
+}
+
+.tabs .tab a:focus,
+.tabs .tab a:focus.active {
+    background-color: transparent;
+    outline: none
+}
+
+.tabs .indicator {
+    position: absolute;
+    bottom: 0;
+    height: 2px;
+    background-color: #ff6f00;
+    will-change: left, right
+}
+
+.tabs .tab a:hover, .tabs .tab a.active {
+    background-color: transparent;
+    color: #ff6f00;
+}
+
+blockquote {
+    margin: 20px 0;
+    padding-left: 1.5rem;
+    border-left: 5px solid #fafafa;
+}
+
 .default-footer .container {
     width: 100%;
 }

@@ -1,0 +1,43 @@
+{% extends "stampo.htm" %}
+{% block title %}About{% endblock %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function () {
+            $('.tabs').tabs();
+        });
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="info-panel">
+            <div class="col s12" style="padding-left:0px; padding-right:0px;">
+                <ul class="tabs">
+                    <li class="tab col s3"><a href="#intro">{{ gettext("Introducing Ristorazione") }}</a></li>
+                    <li class="tab col s3"><a href="#features">{{ gettext("Features") }}</a></li>
+                    <li class="tab col s3"><a href="#subs">{{ gettext("Subscription") }}</a></li>
+                    <li class="tab col s3" style="background-color: #ff6f00"></li>
+                </ul>
+            </div>
+            <br>
+            <div id="intro" class="col s12" style="background-color: #ff6f00; color: #fafafa">
+                <h3>{{ gettext("What is Ristorazione?") }}</h3>
+                <p class="flow-text">{{ gettext("Ristorazione is a freemium software that allows the owner
+                of a restaurant to offer a rich experience to his customers,
+                allowing them to choose their meal in a much more interactive and straightforward way, while at the same time reducing
+                the use of paper menus, to reduce overall waste and making them more easily updatable.") }}</p>
+                <h3>{{ gettext("What does \"freemium\" mean? ") }}</h3>
+                <p class="flow-text">{{ gettext("The word freemium is the fusion of the words free and premium.
+                This means, in regards to Ristorazione, that its essentials features are accessible by anyone, while
+                some others are locked behind a monthly subscription. To learn more about this topic, please read the
+                \"Subscription\" section.") }}</p>
+            </div>
+            <div id="features" class="col s12" style="background-color: #ff6f00; color: #fafafa">
+                <h3>{{ gettext("Lorem ipsum?") }}</h3>
+                <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+            </div>
+            <div id="subs" class="col s12" style="background-color: #ff6f00; color: #fafafa">
+                <h3>{{ gettext("Lorem ipsum?") }}</h3>
+                <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+            </div>
+        </div>
+{% endblock %}

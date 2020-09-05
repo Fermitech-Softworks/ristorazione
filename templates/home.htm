@@ -10,14 +10,14 @@
     <div class="outlined-jumbotron">
         <h4>{{ gettext("Looking for a menu? Maybe it's on this site...") }}</h4>
         <div class="row">
-            <form class="col s12">
+            <form class="col s12" action="/search", method="POST">
                 <div class="input-field col s10">
-                    <i class="material-icons prefix" style="color: black">search</i>
-                    <input id="search" type="text">
+                    <i class="material-icons prefix" style="color: black" >search</i>
+                    <input id="search" type="text" name="search">
                     <label for="search">{{ gettext("Search a restaurant") }}</label>
                 </div>
                 <div class="input-field col s2">
-                    <center><a class="btn-floating btn-large waves-effect waves-light amber darken-4">{{ gettext("Go") }}</a></center>
+                    <center><button class="btn-floating btn-large waves-effect waves-light amber darken-4" type="submit">{{ gettext("Go") }}</button></center>
                 </div>
             </form>
         </div>
@@ -32,8 +32,8 @@
                 <div class="col l4 offset-l2 s12">
                     <h5 class="white-text">Links</h5>
                     <ul>
-                        <li><a class="grey-text text-lighten-3" href="#!">{{ gettext ("Subscription plans") }}</a></li>
-                        <li><a class="grey-text text-lighten-3" href="#!">{{ gettext ("Features") }}</a></li>
+                        <li><a class="grey-text text-lighten-3" href="/about#features">{{ gettext ("Features") }}</a></li>
+                        <li><a class="grey-text text-lighten-3" href="/about#subs">{{ gettext ("Subscription plans") }}</a></li>
                         <li><a class="grey-text text-lighten-3" href="#!">{{ gettext ("Cookie policy") }}</a></li>
                         <li><a class="grey-text text-lighten-3" href="#!">{{ gettext ("Privacy policy") }}</a></li>
                     </ul>

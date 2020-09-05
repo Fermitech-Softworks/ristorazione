@@ -1,5 +1,4 @@
 from enum import Enum, IntEnum
-
 from flask import Flask, session, url_for, redirect, request, render_template, abort
 from flask_babel import Babel, gettext
 from flask_sqlalchemy import SQLAlchemy
@@ -7,6 +6,7 @@ import bcrypt
 import os
 import datetime
 import functools
+from fuzzywuzzy import process
 
 import requests
 
@@ -46,7 +46,6 @@ class User(db.Model):
     type = db.Column(db.Integer, nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="employees")
     restaurantId = db.Column(db.Integer, db.ForeignKey("restaurant.rid"))
-
 
 
 class Restaurant(db.Model):
@@ -184,24 +183,24 @@ def get_locale():
 # Error pages with cats
 
 
-#@app.errorhandler(400)
-#def page_400(_):
-#    return render_template('error.htm', e=400), 400
-#
-#
-#@app.errorhandler(403)
-#def page_403(_):
-#    return render_template('error.htm', e=403), 403
-#
-#
-#@app.errorhandler(404)
-#def page_404(_):
-#    return render_template('error.htm', e=404), 404
-#
-#
-#@app.errorhandler(500)
-#def page_500(_):
-#    return render_template('error.htm', e=500), 500
+@app.errorhandler(400)
+def page_400(_):
+    return render_template('error.htm', e=400, invert=True), 400
+
+
+@app.errorhandler(403)
+def page_403(_):
+    return render_template('error.htm', e=403, invert=True), 403
+
+
+@app.errorhandler(404)
+def page_404(_):
+    return render_template('error.htm', e=404, invert=True), 404
+
+
+@app.errorhandler(500)
+def page_500(_):
+    return render_template('error.htm', e=500, invert=True), 500
 
 
 # Pages for the guests
@@ -256,6 +255,48 @@ def page_register():
 def page_dashboard():
     user = find_user(session['email'])
     return render_template("dashboard.htm", user=user)
+
+
+@app.route("/restaurant/add", methods=['GET', 'POST'])
+@login_or_403
+def page_restaurant_add():
+    user = find_user(session['email'])
+    if request.method == 'GET':
+        return render_template("Restaurant/addOrMod.htm", user=user)
+    if user.type < UserType.owner:
+        user.type = UserType.owner
+    name = request.form.get("name")
+    tax = float(request.form.get("tax"))
+    numberOfTables = int(request.form.get("numberOfTables"))
+    newRestaurant = Restaurant(name=name, tax=tax)
+    db.session.add(newRestaurant)
+    db.session.commit()
+    user.restaurantId = newRestaurant.rid
+    for i in range(0, numberOfTables, 1):
+        db.session.add(Table(tid=i, restaurantId=newRestaurant.rid))
+    db.session.commit()
+    return redirect(url_for('page_dashboard'))
+
+
+@app.route("/search", methods=['POST'])
+def page_search():
+    searchKey = request.form.get("search")
+    restaurants = Restaurant.query.all()
+    result = dict()
+    for restaurant in restaurants:
+        v = []
+        v.append(restaurant.name)
+        value = process.extract(searchKey, v)
+        if int(value[0][1]) >= 60:
+            result[restaurant] = int(value[0][1])
+    result = sorted(result.items(), key=lambda x: x[1], reverse=True)
+    print(result)
+    return render_template("Restaurant/list.htm", restaurants=result, invert=True, mode="search")
+
+
+@app.route("/about")
+def page_about():
+    return render_template("about.htm")
 
 
 if __name__ == "__main__":
