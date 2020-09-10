@@ -164,6 +164,10 @@ def clearance_level(minimum):
                 return
             return f(*args, utente=utente, **kwargs)
 
+        return func
+
+    return decorator
+
 
 def login_or_redirect(f):
     @functools.wraps(f)
@@ -278,6 +282,137 @@ def page_restaurant_add():
     return redirect(url_for('page_dashboard'))
 
 
+@app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
+@clearance_level(UserType.owner)
+def page_restaurant_management(rid):
+    user = find_user(session['email'])
+    check = Restaurant.query.join(User).filer_by(uid=user.uid, rid=rid).first()
+    if not check:
+        abort(403)
+        return
+    data = Restaurant.query.Join(User).Join(Menu).Join(Table).all()
+    return render_template("Restaurant/management.htm", data=data)
+
+
+@app.route("/restaurant/<int:rid>/add_waiterOrOwner/<int:mode>", methods=['POST'])
+@clearance_level(UserType.owner)
+def page_restaurant_add_waiter_or_owner(rid, mode):
+    user = find_user(session['email'])
+    check = Restaurant.query.join(User).filer_by(uid=user.uid, rid=rid).first()
+    if not check:
+        abort(403)
+        return
+    email = request.form.get('email')
+    human = User.query.get_or_404(email)
+    if mode == 0:
+        if human.type >= UserType.waiter:
+            abort(403)
+            return  # Todo: add a webpage that explains why the waiter cannot be added
+        human.type = UserType.waiter
+        human.restaurantId = rid
+    if mode == 1:
+        if human.type >= UserType.owner:
+            abort(403)
+            return  # Todo: add a webpage that explains why the owner cannot be added
+        human.type = UserType.owner
+        human.restaurantId = rid
+    db.session.commit()
+    return redirect(url_for('page_restaurant_management', rid=rid))
+
+
+# Todo: add a subscription check
+
+@app.route("/menu/add/<int:rid>", methods=['GET', 'POST'])  # Needs frontend!
+@clearance_level(UserType.owner)
+def page_menu_add(rid):
+    user = find_user(session['email'])
+    check = Restaurant.query.join(User).filer_by(uid=user.uid, rid=rid).first()
+    if not check:
+        abort(403)
+        return
+    if request.method == "GET":
+        return render_template("Menu/addOrMod.htm", user=user, rid=rid)
+    else:
+        name = request.form.get("name")
+        newMenu = Menu(name=name, restaurantId=rid, enabled=True)
+        db.session.add(newMenu)
+        db.session.commit()
+        return redirect(url_for("page_menu_details", mid=newMenu.mid))
+
+
+@app.route("/menu/details/<int:mid>", methods=['GET'])  # Needs frontend!
+@clearance_level(UserType.waiter)
+def page_menu_details(mid):
+    user = find_user(session['email'])
+    check = Menu.query.join(Restaurant).join(User).filter_by(uid=user.uid, mid=mid).first()
+    if not check:
+        abort(403)
+        return
+    menu = Menu.query.join(Category).get_or_404(mid)
+    return render_template("Menu/details.htm", menu=menu, user=user)
+
+
+@app.route("/menu/<int:mid>/category/add", methods=['GET', 'POST'])  # Needs frontend!
+@clearance_level(UserType.owner)
+def page_category_add(mid):
+    user = find_user(session['email'])
+    check = Menu.query.join(Restaurant).join(User).filter_by(uid=user.uid, mid=mid).first()
+    if not check:
+        abort(403)
+        return
+    if request.method == "GET":
+        categories = Category.query.filter_by(menuId=mid).all()
+        return render_template("Menu/Category/addOrMod.htm", user=user, mid=mid, categories=categories)
+    else:
+        name = request.form.get('name')
+        if request.form.get('subcategoryCheck'):
+            subcategory = request.form.get('subcategorySelect')
+            newCat = Category(name=name, parentId=int(subcategory))
+        else:
+            newCat = Category(name=name, menuId=mid)
+        db.session.add(newCat)
+        db.session.commit()
+        return redirect(url_for("page_menu_details", mid=mid))
+
+
+@app.route("/menu/<int:mid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
+@clearance_level(UserType.owner)
+def page_dish_add(mid):
+    user = find_user(session['email'])
+    check = Menu.query.join(Restaurant).join(User).filter_by(uid=user.uid, mid=mid).first()
+    if not check:
+        abort(403)
+        return
+    if request.method == "GET":
+        categories = Category.query.filter_by(menuId=mid).all()
+        return render_template("Menu/Plate/addOrMod.htm", user=user, mid=mid, categories=categories)
+    name = request.form.get('name')
+    description = request.form.get('description')
+    ingredients = request.form.get('ingredients')
+    cost = float(request.form.get('cost'))
+    subcategory = request.form.get('subcategorySelect')
+    newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost,
+                    subcategory=int(subcategory))
+    db.session.add(newDish)
+    db.session.commit()
+    return redirect(url_for("page_menu_details", mid=mid))
+
+
+@app.route("/menu/category/<int:cid>/getComponents")
+def page_menu_get_components(cid):
+    subcats = Category.query.filter_by(parentId=cid).order_by(Category.name).all()
+    dishes = Plate.query.filter_by(category_id=cid).order_by(Plate.name).all()
+    response = {'subcats': [], 'dishes': []}
+    for cat in subcats:  # Meow, I'm underwater!
+        temp = {'name': cat.name, 'cid': cat.cid}
+        # Purr purr
+        response['subcats'].append(temp)
+    for dish in dishes:
+        temp = {'name': dish.name, 'description': dish.description, 'ingredients': dish.ingredients, 'cost': dish.cost}
+        response['dishes'].append(temp)
+    return response
+
+
 @app.route("/search", methods=['POST'])
 def page_search():
     searchKey = request.form.get("search")
@@ -290,7 +425,6 @@ def page_search():
         if int(value[0][1]) >= 60:
             result[restaurant] = int(value[0][1])
     result = sorted(result.items(), key=lambda x: x[1], reverse=True)
-    print(result)
     return render_template("Restaurant/list.htm", restaurants=result, invert=True, mode="search")
 
 
