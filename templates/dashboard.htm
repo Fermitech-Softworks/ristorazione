@@ -1,5 +1,16 @@
 {% extends "stampo.htm" %}
 {% block title %}Dashboard{% endblock %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function () {
+            $('.tabs').tabs();
+        });
+
+        $(document).ready(function () {
+            $('.collapsible').collapsible();
+        });
+    </script>
+{% endblock %}
 {% block content %}
     <div class="default-jumbotron">
         <div class="default-jumbotron-content">
@@ -8,13 +19,76 @@
         </div>
     </div>
     <div class="outlined-jumbotron">
-        {% if user.type==0 %}
+        {% if restaurants is not defined %}
             <p class="flow-text">{{ gettext("You currently are an undefined kind of user.
             If you are a waiter, wait for your boss to add you to the corresponding restaurant.
             If you are a restaurant owner, please create your restaurant.") }}</p>
-        {% elif user.type==1 %}
-        {% elif user.type==2 %}
-        {% elif user.type==3 %}
+        {% else %}
+            <div class="row">
+                <div class="info-panel">
+                    <div class="col s12" style="padding-left:0px; padding-right:0px;">
+                        <ul class="tabs">
+                            <li class="tab col s3"><a href="#restaurant">{{ gettext("Restaurants") }}</a></li>
+                            <li class="tab col s3"><a href="#menues">{{ gettext("Menus") }}</a></li>
+                            <li class="tab col s3"><a href="#account">{{ gettext("Account") }}</a></li>
+                            <li class="tab col s3" style="background-color: #ff6f00"></li>
+                        </ul>
+                    </div>
+                    <br>
+                    <div id="restaurant" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                        <ul class="collapsible">
+                            <li>
+                                <div class="collapsible-header"><i class="material-icons">local_dining</i>List of
+                                    restaurants
+                                </div>
+                                <div class="collapsible-body">
+                                    <h5>{{ gettext("Your restaurants:") }}</h5>
+                                    <ul class="collection">
+                                        {% for restaurant in restaurants %}
+                                            <li class="collection-item avatar">
+                                                <i class="material-icons circle" style="background-color: #ff6f00">local_dining</i>
+                                                <span class="title">{{ restaurant.name }}</span>
+                                                <div class="row">
+                                                    <div class="col s6">
+                                                        <p>
+                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/0">{{ gettext("Add a waiter") }}</a><br>
+                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/1">{{ gettext("Add an owner") }}</a><br>
+                                                            {{ gettext("Add a menu") }}
+                                                        </p>
+                                                        <a href="/restaurant/{{ restaurant.rid }}/edit"
+                                                           class="secondary-content"
+                                                           style="color: #ff6f00"><i
+                                                                class="material-icons">edit</i></a>
+                                                    </div>
+                                                    <div class="col s6">
+                                                        <p>
+                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/0">{{ gettext("Edit personnel") }}</a><br>
+                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/1">{{ gettext("Edit menus") }}</a><br>
+                                                            {{ gettext("Manage the subscription") }}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </li>
+                        </ul>
+                        <a href="/restaurant/add" class="btn waves-effect waves-light" type="submit"
+                           name="action">{{ gettext("Add a restaurant") }}
+                            <i class="material-icons right">add</i>
+                        </a>
+                    </div>
+                    <div id="menues" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                        <h3>{{ gettext("Lorem ipsum?") }}</h3>
+                        <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                    </div>
+                    <div id="account" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                        <h3>{{ gettext("Lorem ipsum?") }}</h3>
+                        <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                    </div>
+                </div>
+            </div>
         {% endif %}
     </div>
 {% endblock %}

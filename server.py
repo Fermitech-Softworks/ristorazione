@@ -23,18 +23,8 @@ app.config['UPLOAD_FOLDER'] = "./static"
 ALLOWED_EXTENSIONS = set(['txt', 'md', 'pdf', 'doc', 'docx'])
 db = SQLAlchemy(app)
 
+
 # DB classes go beyond this point
-
-
-ordersTable = db.Table('orders', db.metadata,
-                       db.Column('tableId', db.Integer, db.ForeignKey('table.tid')),
-                       db.Column('plateId', db.Integer, db.ForeignKey('plate.cid')),
-                       db.Column('quantity', db.Integer, nullable=False))
-
-subscriptionTable = db.Table('subs', db.metadata,
-                             db.Column('restaurantId', db.Integer, db.ForeignKey('restaurant.rid')),
-                             db.Column('subId', db.Integer, db.ForeignKey('subscription.sid')),
-                             db.Column('nextPayment', db.DateTime, nullable=False))
 
 
 class User(db.Model):
@@ -43,20 +33,28 @@ class User(db.Model):
     password = db.Column(db.LargeBinary, nullable=False)
     name = db.Column(db.String, nullable=False)
     surname = db.Column(db.String, nullable=False)
-    type = db.Column(db.Integer, nullable=False)
-    restaurant = db.relationship("Restaurant", back_populates="employees")
-    restaurantId = db.Column(db.Integer, db.ForeignKey("restaurant.rid"))
+    isAdmin = db.Column(db.Boolean, nullable=False)
+    work = db.relationship("Work", back_populates="user")
 
 
 class Restaurant(db.Model):
     __tablename__ = "restaurant"
     rid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
-    employees = db.relationship("User", back_populates="restaurant")
+    work = db.relationship("Work", back_populates="restaurant")
     menus = db.relationship("Menu", back_populates="restaurant")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant")
-    subbed = db.relationship("Subscription", secondary=subscriptionTable, back_populates="restaurants")
+    sub = db.relationship("SubscriptionAssociation", back_populates="restaurant")
+
+
+class Work(db.Model):
+    __tablename__ = "work"
+    userEmail = db.Column(db.String, db.ForeignKey('user.email'), primary_key=True)
+    restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
+    type = db.Column(db.Integer, nullable=False)
+    user = db.relationship("User", back_populates="work")
+    restaurant = db.relationship("Restaurant", back_populates="work")
 
 
 class Subscription(db.Model):
@@ -67,7 +65,16 @@ class Subscription(db.Model):
     monthlyCost = db.Column(db.Float, nullable=False)
     level = db.Column(db.Integer, nullable=False)
     duration = db.Column(db.Integer, nullable=False)  # Number of months
-    restaurants = db.relationship("Restaurant", secondary=subscriptionTable, back_populates="subbed")
+    sub = db.relationship("SubscriptionAssociation", back_populates="subscription")
+
+
+class SubscriptionAssociation(db.Model):
+    __tablename__ = "subscriptionsAssociation"
+    restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
+    subscriptionId = db.Column(db.Integer, db.ForeignKey('subscription.sid'), primary_key=True)
+    nextPayment = db.Column(db.DateTime, nullable=False)
+    restaurant = db.relationship("Restaurant", back_populates="sub")
+    subscription = db.relationship("Subscription", back_populates="sub")
 
 
 class Table(db.Model):
@@ -76,7 +83,7 @@ class Table(db.Model):
     restaurant = db.relationship("Restaurant", back_populates="tables")
     restaurantId = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), primary_key=True)
     token = db.Column(db.String(10))
-    plates = db.relationship("Plate", secondary=ordersTable, back_populates="ordered")
+    order = db.relationship("Order", back_populates="table")
 
 
 class Menu(db.Model):
@@ -102,14 +109,23 @@ class Category(db.Model):
 
 class Plate(db.Model):
     __tablename__ = "plate"
-    cid = db.Column(db.Integer, primary_key=True)
+    pid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
     ingredients = db.Column(db.String)
     cost = db.Column(db.Float, nullable=False)
     category = db.relationship("Category", back_populates="plates")
     category_id = db.Column(db.Integer, db.ForeignKey("category.cid"))
-    ordered = db.relationship("Table", secondary=ordersTable, back_populates="plates")
+    order = db.relationship("Order", back_populates="plate")
+
+
+class Order(db.Model):
+    __tablename__ = "order"
+    tableId = db.Column(db.Integer, db.ForeignKey('table.tid'), primary_key=True)
+    plateId = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    table = db.relationship("Table", back_populates="order")
+    plate = db.relationship("Plate", back_populates="order")
 
 
 # UTILITIES
@@ -118,7 +134,7 @@ class UserType(IntEnum):
     undefined = 0
     waiter = 1
     owner = 2
-    platformAdmin = 3
+    admin = 3
 
 
 def login(email, password):
@@ -248,7 +264,7 @@ def page_register():
     password = request.form.get("password")
     p = bytes(password, encoding="utf-8")
     ash = bcrypt.hashpw(p, bcrypt.gensalt())
-    newUser = User(name=name, surname=surname, email=email, password=ash, type=UserType.undefined)
+    newUser = User(name=name, surname=surname, email=email, password=ash, isAdmin=False)
     db.session.add(newUser)
     db.session.commit()
     return redirect(url_for('page_login'))
@@ -258,7 +274,10 @@ def page_register():
 @login_or_403
 def page_dashboard():
     user = find_user(session['email'])
-    return render_template("dashboard.htm", user=user)
+    restaurants = Restaurant.query.join(Work).join(User).filter_by(email=user.email).all()
+    if not restaurants:
+        mode = 1
+    return render_template("dashboard.htm", user=user, restaurants=restaurants)
 
 
 @app.route("/restaurant/add", methods=['GET', 'POST'])
@@ -267,8 +286,6 @@ def page_restaurant_add():
     user = find_user(session['email'])
     if request.method == 'GET':
         return render_template("Restaurant/addOrMod.htm", user=user)
-    if user.type < UserType.owner:
-        user.type = UserType.owner
     name = request.form.get("name")
     tax = float(request.form.get("tax"))
     numberOfTables = int(request.form.get("numberOfTables"))
@@ -278,15 +295,16 @@ def page_restaurant_add():
     user.restaurantId = newRestaurant.rid
     for i in range(0, numberOfTables, 1):
         db.session.add(Table(tid=i, restaurantId=newRestaurant.rid))
+    newWork = Work(userEmail=user.email, restaurantId=newRestaurant.rid, type=UserType.owner)
+    db.session.add(newWork)
     db.session.commit()
     return redirect(url_for('page_dashboard'))
 
 
 @app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
-@clearance_level(UserType.owner)
 def page_restaurant_management(rid):
     user = find_user(session['email'])
-    check = Restaurant.query.join(User).filer_by(uid=user.uid, rid=rid).first()
+    check = Restaurant.query.join(Work).join(User).filer_by(uid=user.uid, rid=rid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -295,25 +313,18 @@ def page_restaurant_management(rid):
 
 
 @app.route("/restaurant/<int:rid>/add_waiterOrOwner/<int:mode>", methods=['POST'])
-@clearance_level(UserType.owner)
 def page_restaurant_add_waiter_or_owner(rid, mode):
     user = find_user(session['email'])
-    check = Restaurant.query.join(User).filer_by(uid=user.uid, rid=rid).first()
+    check = Restaurant.query.join(Work).join(User).filer_by(uid=user.uid, rid=rid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
     email = request.form.get('email')
     human = User.query.get_or_404(email)
     if mode == 0:
-        if human.type >= UserType.waiter:
-            abort(403)
-            return  # Todo: add a webpage that explains why the waiter cannot be added
-        human.type = UserType.waiter
-        human.restaurantId = rid
+        pass
     if mode == 1:
-        if human.type >= UserType.owner:
-            abort(403)
-            return  # Todo: add a webpage that explains why the owner cannot be added
+        pass
         human.type = UserType.owner
         human.restaurantId = rid
     db.session.commit()
@@ -323,10 +334,9 @@ def page_restaurant_add_waiter_or_owner(rid, mode):
 # Todo: add a subscription check
 
 @app.route("/menu/add/<int:rid>", methods=['GET', 'POST'])  # Needs frontend!
-@clearance_level(UserType.owner)
 def page_menu_add(rid):
     user = find_user(session['email'])
-    check = Restaurant.query.join(User).filer_by(uid=user.uid, rid=rid).first()
+    check = Restaurant.query.join(Work).join(User).filer_by(uid=user.uid, rid=rid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -341,10 +351,9 @@ def page_menu_add(rid):
 
 
 @app.route("/menu/details/<int:mid>", methods=['GET'])  # Needs frontend!
-@clearance_level(UserType.waiter)
 def page_menu_details(mid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(User).filter_by(uid=user.uid, mid=mid).first()
+    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -353,10 +362,9 @@ def page_menu_details(mid):
 
 
 @app.route("/menu/<int:mid>/category/add", methods=['GET', 'POST'])  # Needs frontend!
-@clearance_level(UserType.owner)
 def page_category_add(mid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(User).filter_by(uid=user.uid, mid=mid).first()
+    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -376,10 +384,9 @@ def page_category_add(mid):
 
 
 @app.route("/menu/<int:mid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
-@clearance_level(UserType.owner)
 def page_dish_add(mid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(User).filter_by(uid=user.uid, mid=mid).first()
+    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -437,11 +444,11 @@ if __name__ == "__main__":
     # Aggiungi sempre le tabelle non esistenti al database, senza cancellare quelle vecchie
     print("Ciao")
     db.create_all()
-    user = User.query.filter_by(type=UserType.platformAdmin).all()
+    user = User.query.filter_by(isAdmin=True).all()
     if len(user) == 0:
         p = bytes("password", encoding="utf-8")
         ash = bcrypt.hashpw(p, bcrypt.gensalt())
-        newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", type=3, password=ash)
+        newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", isAdmin=True, password=ash)
         db.session.add(newUser)
         db.session.commit()
     app.run(debug=True, host='0.0.0.0')
