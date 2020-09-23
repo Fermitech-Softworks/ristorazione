@@ -2,6 +2,7 @@ from enum import Enum, IntEnum
 from flask import Flask, session, url_for, redirect, request, render_template, abort
 from flask_babel import Babel, gettext
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 import bcrypt
 import os
 import datetime
@@ -42,7 +43,7 @@ class Restaurant(db.Model):
     rid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     work = db.relationship("Work", back_populates="restaurant")
-    menus = db.relationship("Menu", back_populates="restaurant")
+    menus = db.relationship("MenuAssociation", back_populates="restaurant")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant")
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant")
@@ -91,9 +92,16 @@ class Menu(db.Model):
     mid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.Integer, nullable=False)
     enabled = db.Column(db.Boolean, nullable=False)
-    restaurant = db.relationship("Restaurant", back_populates="menus")
-    restaurantId = db.Column(db.Integer, db.ForeignKey("restaurant.rid"))
+    restaurants = db.relationship("MenuAssociation", back_populates="menu")
     topLevelCategories = db.relationship("Category", back_populates="menu")
+
+
+class MenuAssociation(db.Model):
+    __tablename__ = "menuAssociation"
+    menuId = db.Column(db.Integer, db.ForeignKey('menu.mid'), primary_key=True)
+    restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
+    menu = db.relationship("Menu", back_populates="restaurants")
+    restaurant = db.relationship("Restaurant", back_populates="menus")
 
 
 class Category(db.Model):
@@ -304,12 +312,12 @@ def page_restaurant_add():
 @app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
 def page_restaurant_management(rid):
     user = find_user(session['email'])
-    check = Restaurant.query.join(Work).join(User).filer_by(uid=user.uid, rid=rid, type=UserType.owner).first()
+    check = Work.query.filter_by(restaurantId=rid, userEmail=user.email).first()
     if not check:
         abort(403)
         return
-    data = Restaurant.query.Join(User).Join(Menu).Join(Table).all()
-    return render_template("Restaurant/management.htm", data=data)
+    data = Restaurant.query.filter_by(rid=rid).first()
+    return render_template("Restaurant/management.htm", data=data, user=user)
 
 
 @app.route("/restaurant/<int:rid>/add_waiterOrOwner/<int:mode>", methods=['POST'])
@@ -442,7 +450,7 @@ def page_about():
 
 if __name__ == "__main__":
     # Aggiungi sempre le tabelle non esistenti al database, senza cancellare quelle vecchie
-    print("Ciao")
+    print("Now cooking up the database...")
     db.create_all()
     user = User.query.filter_by(isAdmin=True).all()
     if len(user) == 0:
@@ -451,4 +459,5 @@ if __name__ == "__main__":
         newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", isAdmin=True, password=ash)
         db.session.add(newUser)
         db.session.commit()
+    print("The db is delicious!")
     app.run(debug=True, host='0.0.0.0')

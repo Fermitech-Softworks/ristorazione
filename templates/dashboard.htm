@@ -47,26 +47,16 @@
                                         {% for restaurant in restaurants %}
                                             <li class="collection-item avatar">
                                                 <i class="material-icons circle" style="background-color: #ff6f00">local_dining</i>
-                                                <span class="title">{{ restaurant.name }}</span>
+                                                <span class="title"><h6>{{ restaurant.name }}</h6></span>
                                                 <div class="row">
-                                                    <div class="col s6">
-                                                        <p>
-                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/0">{{ gettext("Add a waiter") }}</a><br>
-                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/1">{{ gettext("Add an owner") }}</a><br>
-                                                            {{ gettext("Add a menu") }}
-                                                        </p>
-                                                        <a href="/restaurant/{{ restaurant.rid }}/edit"
-                                                           class="secondary-content"
-                                                           style="color: #ff6f00"><i
-                                                                class="material-icons">edit</i></a>
-                                                    </div>
-                                                    <div class="col s6">
-                                                        <p>
-                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/0">{{ gettext("Edit personnel") }}</a><br>
-                                                            <a href="/restaurant/{{ restaurant.rid }}/add_waiterOrOwner/1">{{ gettext("Edit menus") }}</a><br>
-                                                            {{ gettext("Manage the subscription") }}
-                                                        </p>
-                                                    </div>
+                                                    {% for work in restaurant.work %}
+                                                        {% if work.type == 2 and work.userEmail == user.email %}
+                                                            <a href="/restaurant/{{ restaurant.rid }}/management"
+                                                               class="secondary-content"
+                                                               style="color: #ff6f00"><i
+                                                                    class="material-icons">edit</i></a>
+                                                        {% endif %}
+                                                    {% endfor %}
                                                 </div>
                                             </li>
                                         {% endfor %}

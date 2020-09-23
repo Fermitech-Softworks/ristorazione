@@ -1,0 +1,40 @@
+{% extends "stampo.htm" %}
+{% block title %}Management{% endblock %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function () {
+            $('.tabs').tabs();
+        });
+    </script>
+{% endblock extrahead %}
+{% block content %}
+    <div style="color: #ff6f00">
+        <h1>{{ gettext("Welcome to the management panel.") }}</h1>
+        <h5>{{ gettext("From here, you can add or remove personnel, menus and manage your subscription.") }}</h5> <br>
+    </div>
+    <div class="outlined-jumbotron">
+        <div class="row">
+            <div class="info-panel">
+                <div class="col s12" style="padding-left:0px; padding-right:0px;">
+                    <ul class="tabs">
+                        <li class="tab col s3"><a href="#personnel">{{ gettext("Personnel") }}</a></li>
+                        <li class="tab col s3"><a href="#menues">{{ gettext("Menues") }}</a></li>
+                        <li class="tab col s3"><a href="#subscription">{{ gettext("Subscription") }}</a></li>
+                        <li class="tab col s3" style="background-color: #ff6f00"></li>
+                    </ul>
+                </div>
+                <br>
+                <div id="personnel" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                </div>
+                <div id="menues" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                    <h3>{{ gettext("Lorem ipsum?") }}</h3>
+                    <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                </div>
+                <div id="subscription" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                    <h3>{{ gettext("Lorem ipsum?") }}</h3>
+                    <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
