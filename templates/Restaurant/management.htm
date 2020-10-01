@@ -5,12 +5,70 @@
         $(document).ready(function () {
             $('.tabs').tabs();
         });
+        $(document).ready(function () {
+            $('.collapsible').collapsible();
+        });
+
+        function addPersonnel(rid, mode) {
+            var xhr = new XMLHttpRequest();
+            console.log(mode);
+            if (mode === 0) {
+                refTable = document.getElementById("waiterTableBody")
+                errBox = document.getElementById("waiterError")
+                input = document.getElementById("emailWaiter")
+            } else {
+                refTable = document.getElementById("managerTableBody")
+                errBox = document.getElementById("managerError")
+                input = document.getElementById("emailManager")
+            }
+            refTable.innerHTML = ""
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        updatePersonnel(rid);
+                    } else {
+                        errBox.innerHTML =
+                            "{{ gettext("The user could not be found.")}}"
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/" + rid + "/add_waiterOrOwner/" + mode, true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            var parametri = "email=" + input.value;
+            xhr.send(parametri)
+        }
+
+        function updatePersonnel(rid) {
+            var xhr = new XMLHttpRequest();
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        document.getElementById("managerTableBody").innerHTML = xhr.responseText;
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/" + rid + "/getOwners", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send()
+            var xhr2 = new XMLHttpRequest();
+            xhr2.addEventListener("readystatechange", function () {
+                if (xhr2.readyState === 4) {
+                    if (xhr2.status === 200) {
+                        document.getElementById("waiterTableBody").innerHTML = xhr2.responseText;
+                    }
+                }
+            });
+            xhr2.open("POST", "/restaurant/" + rid + "/getWaiters", true);
+            xhr2.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr2.send()
+        }
     </script>
 {% endblock extrahead %}
 {% block content %}
     <div style="color: #ff6f00">
-        <h1>{{ gettext("Welcome to the management panel.") }}</h1>
-        <h5>{{ gettext("From here, you can add or remove personnel, menus and manage your subscription.") }}</h5> <br>
+        <h1>{{ gettext("Welcome,") }}</h1>
+        <h5>{{ gettext("This is your management panel.") }}</h5> <br>
     </div>
     <div class="outlined-jumbotron">
         <div class="row">
@@ -18,17 +76,170 @@
                 <div class="col s12" style="padding-left:0px; padding-right:0px;">
                     <ul class="tabs">
                         <li class="tab col s3"><a href="#personnel">{{ gettext("Personnel") }}</a></li>
-                        <li class="tab col s3"><a href="#menues">{{ gettext("Menues") }}</a></li>
+                        <li class="tab col s3"><a href="#menus">{{ gettext("Menus") }}</a></li>
                         <li class="tab col s3"><a href="#subscription">{{ gettext("Subscription") }}</a></li>
                         <li class="tab col s3" style="background-color: #ff6f00"></li>
                     </ul>
                 </div>
                 <br>
                 <div id="personnel" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                    <div style="color: #ff6f00">
+                        <h5>{{ gettext("From here, you can manage your personnel.") }}</h5>
+                    </div>
+                    <ul class="collapsible">
+                        <li>
+                            <div class="collapsible-header"><i
+                                    class="material-icons">person</i>{{ gettext("List of managers") }}
+                            </div>
+                            <div class="collapsible-body">
+                                <ul class="collection">
+                                    <table>
+                                        <thead>
+                                        <tr>
+                                            <th>{{ gettext("Name") }}</th>
+                                            <th>{{ gettext("Surname") }}</th>
+                                            <th>{{ gettext("Email") }}</th>
+                                            <th>{{ gettext("Actions") }}</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="managerTableBody">
+                                        {% for work in data.work %}
+                                            {% if work.type == 2 %}
+                                                <tr>
+                                                    <td>{{ work.user.name }}</td>
+                                                    <td>{{ work.user.surname }}</td>
+                                                    <td>{{ work.user.email }}</td>
+                                                    <td><i class="material-icons">delete</i></td>
+                                                </tr>
+                                            {% endif %}
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    <div class="input-field col s10">
+                                        <input id="emailManager" type="text" name="email">
+                                        <label for="emailManager">{{ gettext("Enter the manager's email.") }}</label>
+                                    </div>
+                                    <div class="input-field col s2">
+                                        <div class="input-field col s6">
+                                            <button class="btn waves-effect waves-light" type="submit"
+                                                    name="action"
+                                                    onclick="addPersonnel({{ data.rid }}, 1)">{{ gettext("Add manager") }}
+                                                <i class="material-icons right">send</i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="managerError">
+
+                                    </div>
+                                </ul>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="collapsible-header"><i
+                                    class="material-icons">people</i>{{ gettext("List of waiters") }}
+                            </div>
+                            <div class="collapsible-body">
+                                <ul class="collection">
+                                    <table>
+                                        <thead>
+                                        <tr>
+                                            <th>{{ gettext("Name") }}</th>
+                                            <th>{{ gettext("Surname") }}</th>
+                                            <th>{{ gettext("Email") }}</th>
+                                            <th>{{ gettext("Actions") }}</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="waiterTableBody">
+                                        {% for work in data.work %}
+                                            {% if work.type == 1 %}
+                                                <tr>
+                                                    <td>{{ work.user.name }}</td>
+                                                    <td>{{ work.user.surname }}</td>
+                                                    <td>{{ work.user.email }}</td>
+                                                    <td></td>
+                                                </tr>
+                                            {% endif %}
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                    <div class="input-field col s10">
+                                        <input id="emailWaiter" type="text" name="email">
+                                        <label for="emailWaiter">{{ gettext("Enter the waiter's email.") }}</label>
+                                    </div>
+                                    <div class="input-field col s2">
+                                        <div class="input-field col s6">
+                                            <button class="btn waves-effect waves-light" type="submit"
+                                                    name="action"
+                                                    onclick="addPersonnel({{ data.rid }}, 0)">{{ gettext("Add waiter") }}
+                                                <i class="material-icons right">send</i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="waiterError">
+
+                                    </div>
+                                </ul>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
-                <div id="menues" class="col s12" style="background-color:#fafafa; color: #ff6f00">
-                    <h3>{{ gettext("Lorem ipsum?") }}</h3>
-                    <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                <div id="menus" class="col s12" style="background-color:#fafafa; color: #ff6f00">
+                    <div style="color: #ff6f00">
+                        <h5>{{ gettext("From here, you can manage your dishes and menus.") }}</h5>
+                    </div>
+                    <ul class="collapsible">
+                        <li>
+                            <div class="collapsible-header"><i
+                                    class="material-icons">local_pizza</i>{{ gettext("Plates") }}</div>
+                            <div class="collapsible-body">
+                                <a href="/restaurant/{{ data.rid }}/dish/add" class="btn waves-effect waves-light"
+                                   type="submit"
+                                   name="action">{{ gettext("Create new dish") }}
+                                    <i class="material-icons right">local_pizza</i>
+                                </a>
+                                <table>
+                                    <thead>
+                                    <tr>
+                                        <th>{{ gettext("Name") }}</th>
+                                        <th>{{ gettext("Price") }}</th>
+                                        <th>{{ gettext("Actions") }}</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="dishesTableBody">
+                                    {% for ownedPlate in data.ownedPlates %}
+                                        <tr>
+                                            <td>{{ ownedPlate.name }}</td>
+                                            <td>{{ ownedPlate.cost }}</td>
+                                            <td></td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </li>
+                    </ul>
+                    <a href="/menu/add/{{ data.rid }}" class="btn waves-effect waves-light" type="submit"
+                       name="action">{{ gettext("Create new menu") }}
+                        <i class="material-icons right">book</i>
+                    </a>
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>{{ gettext("Name") }}</th>
+                            <th>{{ gettext("Enabled?") }}</th>
+                            <th>{{ gettext("Actions") }}</th>
+                        </tr>
+                        </thead>
+                        <tbody id="dishesTableBody">
+                        {% for association in data.menus %}
+                            <tr>
+                                <td>{{ association.menu.name }}</td>
+                                <td>{{ association.menu.enabled }}</td>
+                                <td></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
                 <div id="subscription" class="col s12" style="background-color:#fafafa; color: #ff6f00">
                     <h3>{{ gettext("Lorem ipsum?") }}</h3>

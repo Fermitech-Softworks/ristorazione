@@ -1,5 +1,5 @@
 from enum import Enum, IntEnum
-from flask import Flask, session, url_for, redirect, request, render_template, abort
+from flask import Flask, session, url_for, redirect, request, render_template, abort, flash
 from flask_babel import Babel, gettext
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
@@ -42,8 +42,12 @@ class Restaurant(db.Model):
     __tablename__ = "restaurant"
     rid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
+    city = db.Column(db.String)
+    address = db.Column(db.String)
+    state = db.Column(db.String)
     work = db.relationship("Work", back_populates="restaurant")
     menus = db.relationship("MenuAssociation", back_populates="restaurant")
+    ownedPlates = db.relationship("Plate", back_populates="restaurant")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant")
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant")
@@ -112,7 +116,7 @@ class Category(db.Model):
     menu = db.relationship("Menu", back_populates="topLevelCategories")
     parentId = db.Column(db.Integer, db.ForeignKey("category.cid"))
     children = db.relationship("Category", backref=db.backref('parent', remote_side=[cid]))
-    plates = db.relationship("Plate", back_populates="category")
+    plates = db.relationship("CategoryAssociation", back_populates="category")
 
 
 class Plate(db.Model):
@@ -122,9 +126,18 @@ class Plate(db.Model):
     description = db.Column(db.String)
     ingredients = db.Column(db.String)
     cost = db.Column(db.Float, nullable=False)
-    category = db.relationship("Category", back_populates="plates")
-    category_id = db.Column(db.Integer, db.ForeignKey("category.cid"))
+    categories = db.relationship("CategoryAssociation", back_populates="plate")
     order = db.relationship("Order", back_populates="plate")
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
+    restaurant = db.relationship("Restaurant", back_populates="ownedPlates")
+
+
+class CategoryAssociation(db.Model):
+    __tablename__ = "categoryAssociation"
+    plateId = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    categoryId = db.Column(db.Integer, db.ForeignKey('category.cid'), primary_key=True)
+    plate = db.relationship("Plate", back_populates="categories")
+    category = db.relationship("Category", back_populates="plates")
 
 
 class Order(db.Model):
@@ -323,20 +336,64 @@ def page_restaurant_management(rid):
 @app.route("/restaurant/<int:rid>/add_waiterOrOwner/<int:mode>", methods=['POST'])
 def page_restaurant_add_waiter_or_owner(rid, mode):
     user = find_user(session['email'])
-    check = Restaurant.query.join(Work).join(User).filer_by(uid=user.uid, rid=rid, type=UserType.owner).first()
+    check = Work.query.filter_by(restaurantId=rid, userEmail=user.email, type=2).first()
     if not check:
         abort(403)
         return
     email = request.form.get('email')
     human = User.query.get_or_404(email)
+    isAlreadyRelated = Work.query.filter_by(restaurantId=rid, userEmail=human.email).first()
+    if isAlreadyRelated:
+        db.session.delete(isAlreadyRelated)
     if mode == 0:
-        pass
-    if mode == 1:
-        pass
-        human.type = UserType.owner
-        human.restaurantId = rid
+        newWork = Work(userEmail=human.email, restaurantId=rid, type=1)
+    else:
+        newWork = Work(userEmail=human.email, restaurantId=rid, type=2)
+    db.session.add(newWork)
     db.session.commit()
-    return redirect(url_for('page_restaurant_management', rid=rid))
+    return "200 - Success"
+
+
+@app.route("/restaurant/<int:rid>/getOwners", methods=['POST'])
+def page_restaurant_get_owners(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(restaurantId=rid, userEmail=user.email, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    msg = ""
+    owners = Work.query.filter(Work.restaurantId == rid, Work.type == UserType.owner).all()
+    for owner in owners:
+        msg = msg + """
+        <tr>
+            <td>{}</td>
+            <td>{}</td>
+            <td>{}</td>
+            <td><i class="material-icons">delete</i></td>
+        </tr>
+        """.format(owner.user.name, owner.user.surname, owner.user.email)
+    return msg
+
+
+@app.route("/restaurant/<int:rid>/getWaiters", methods=['POST'])
+def page_restaurant_get_waiters(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(restaurantId=rid, userEmail=user.email, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    msg = ""
+    waiters = Work.query.filter(Work.restaurantId == rid, Work.type == UserType.waiter).all()
+    for waiter in waiters:
+        msg = msg + """
+        <tr>
+            <td>{}</td>
+            <td>{}</td>
+            <td>{}</td>
+            <td><i class="material-icons">delete</i></td>
+        </tr>
+        """.format(waiter.user.name, waiter.user.surname, waiter.user.email)
+    return msg
 
 
 # Todo: add a subscription check
@@ -344,7 +401,7 @@ def page_restaurant_add_waiter_or_owner(rid, mode):
 @app.route("/menu/add/<int:rid>", methods=['GET', 'POST'])  # Needs frontend!
 def page_menu_add(rid):
     user = find_user(session['email'])
-    check = Restaurant.query.join(Work).join(User).filer_by(uid=user.uid, rid=rid, type=UserType.owner).first()
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -352,8 +409,11 @@ def page_menu_add(rid):
         return render_template("Menu/addOrMod.htm", user=user, rid=rid)
     else:
         name = request.form.get("name")
-        newMenu = Menu(name=name, restaurantId=rid, enabled=True)
+        newMenu = Menu(name=name, enabled=True)
         db.session.add(newMenu)
+        db.session.commit()
+        newAssociation = MenuAssociation(restaurantId=rid, menuId=newMenu.mid)
+        db.session.add(newAssociation)
         db.session.commit()
         return redirect(url_for("page_menu_details", mid=newMenu.mid))
 
@@ -361,7 +421,8 @@ def page_menu_add(rid):
 @app.route("/menu/details/<int:mid>", methods=['GET'])  # Needs frontend!
 def page_menu_details(mid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid, type=UserType.owner).first()
+    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid,
+                                                                        type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -372,7 +433,8 @@ def page_menu_details(mid):
 @app.route("/menu/<int:mid>/category/add", methods=['GET', 'POST'])  # Needs frontend!
 def page_category_add(mid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid, type=UserType.owner).first()
+    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid,
+                                                                        type=UserType.owner).first()
     if not check:
         abort(403)
         return
@@ -391,26 +453,23 @@ def page_category_add(mid):
         return redirect(url_for("page_menu_details", mid=mid))
 
 
-@app.route("/menu/<int:mid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
-def page_dish_add(mid):
+@app.route("/restaurant/<int:rid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
+def page_dish_add(rid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid, type=UserType.owner).first()
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
     if request.method == "GET":
-        categories = Category.query.filter_by(menuId=mid).all()
-        return render_template("Menu/Plate/addOrMod.htm", user=user, mid=mid, categories=categories)
+        return render_template("Menu/Plate/addOrMod.htm", user=user, rid=rid)
     name = request.form.get('name')
     description = request.form.get('description')
     ingredients = request.form.get('ingredients')
     cost = float(request.form.get('cost'))
-    subcategory = request.form.get('subcategorySelect')
-    newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost,
-                    subcategory=int(subcategory))
+    newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost, restaurant_id=rid)
     db.session.add(newDish)
     db.session.commit()
-    return redirect(url_for("page_menu_details", mid=mid))
+    return redirect(url_for("page_restaurant_management"), rid=rid)
 
 
 @app.route("/menu/category/<int:cid>/getComponents")
@@ -456,7 +515,8 @@ if __name__ == "__main__":
     if len(user) == 0:
         p = bytes("password", encoding="utf-8")
         ash = bcrypt.hashpw(p, bcrypt.gensalt())
-        newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", isAdmin=True, password=ash)
+        newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", isAdmin=True,
+                       password=ash)
         db.session.add(newUser)
         db.session.commit()
     print("The db is delicious!")
