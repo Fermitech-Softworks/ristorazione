@@ -1,0 +1,81 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Menu details") }}{% endblock %}
+{% block extrahead %}
+    <script>
+
+        $(document).ready(function () {
+            $('.modal').modal();
+        });
+
+        function addCat(cid, mid) {
+            let xhr = new XMLHttpRequest();
+            refUl = document.getElementById("l" + cid)
+            if (cid === 0) {
+                input = document.getElementById("topLevelCatName")
+            }
+            errBox = document.getElementById("error")
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        refUl.innerHTML = refUl.innerHTML + xhr.responseText
+                    } else {
+                        errBox.innerHTML = xhr.statusText
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/category/add/" + cid, true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            let parametri = "name=" + input.value;
+            xhr.send(parametri)
+        }
+
+
+        function loadData(cid) {
+            $('.collapsible').collapsible();
+            console.log("Sent request by subordinate of " + cid)
+            let xhr = new XMLHttpRequest();
+            refDiv = document.getElementById("c" + cid)
+            errBox = document.getElementById("error")
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        refDiv.innerHTML = xhr.responseText
+                    } else {
+                        errBox.innerHTML = xhr.statusText
+                    }
+                }
+            });
+            xhr.open("POST", "/menu/category/" + cid + "/getComponents", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send()
+        }
+    </script>
+{% endblock %}
+{% block content %}
+    <h5>{{ gettext("You are currently editing the menu ") }}"{{ menu.name }}"</h5>
+    <a class="waves-effect waves-light btn modal-trigger" href="#topLevelModal">Add a top-level category</a>
+    <div id="error"></div>
+    <ul class="collapsible" id="l0" data-collapsible="accordion">
+        {% for cat in menu.topLevelCategories %}
+            <li>
+                <div class="collapsible-header" onclick="loadData({{ cat.cid }})"><i
+                        class="material-icons">filter_drama</i>{{ cat.name }}</div>
+                <div class="collapsible-body" id="c{{ cat.cid }}"></div>
+            </li>
+        {% endfor %}
+    </ul>
+    <!-- Modals Structure -->
+    <div id="topLevelModal" class="modal">
+        <div class="modal-content">
+            <h4>Add a category</h4>
+            <input id="topLevelCatName" name="topLevelCatName">
+            <label for="topLevelCatName">Category Name</label>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-close waves-effect waves-green btn-flat" onclick="addCat(0, {{ menu.mid }})">Add
+            </button>
+        </div>
+    </div>
+{% endblock %}
