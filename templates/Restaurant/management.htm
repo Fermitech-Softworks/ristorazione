@@ -10,7 +10,7 @@
         });
 
         function addPersonnel(rid, mode) {
-            var xhr = new XMLHttpRequest();
+            let xhr = new XMLHttpRequest();
             console.log(mode);
             if (mode === 0) {
                 refTable = document.getElementById("waiterTableBody")
@@ -35,12 +35,12 @@
             });
             xhr.open("POST", "/restaurant/" + rid + "/add_waiterOrOwner/" + mode, true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            var parametri = "email=" + input.value;
+            let parametri = "email=" + input.value;
             xhr.send(parametri)
         }
 
         function updatePersonnel(rid) {
-            var xhr = new XMLHttpRequest();
+            let xhr = new XMLHttpRequest();
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
@@ -51,7 +51,7 @@
             xhr.open("POST", "/restaurant/" + rid + "/getOwners", true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
             xhr.send()
-            var xhr2 = new XMLHttpRequest();
+            let xhr2 = new XMLHttpRequest();
             xhr2.addEventListener("readystatechange", function () {
                 if (xhr2.readyState === 4) {
                     if (xhr2.status === 200) {

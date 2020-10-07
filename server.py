@@ -418,39 +418,44 @@ def page_menu_add(rid):
         return redirect(url_for("page_menu_details", mid=newMenu.mid))
 
 
-@app.route("/menu/details/<int:mid>", methods=['GET'])  # Needs frontend!
-def page_menu_details(mid):
+@app.route("/restaurant/<int:rid>/menu/details/<int:mid>", methods=['GET'])  # Needs frontend!
+def page_menu_details(rid, mid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid,
-                                                                        type=UserType.owner).first()
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
     if not check:
         abort(403)
         return
-    menu = Menu.query.join(Category).get_or_404(mid)
-    return render_template("Menu/details.htm", menu=menu, user=user)
+    menu = Menu.query.filter_by(mid=mid).first()
+    return render_template("Menu/details.htm", menu=menu, user=user, rid=rid)
 
 
-@app.route("/menu/<int:mid>/category/add", methods=['GET', 'POST'])  # Needs frontend!
-def page_category_add(mid):
+@app.route("/restaurant/<int:rid>/menu/<int:mid>/category/add/<int:cid>", methods=['GET', 'POST'])
+def page_category_add(rid, mid, cid):
     user = find_user(session['email'])
-    check = Menu.query.join(Restaurant).join(Work).join(User).filter_by(uid=user.uid, mid=mid,
-                                                                        type=UserType.owner).first()
-    if not check:
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    check2 = MenuAssociation.query.filter_by(menuId=mid, restaurantId=rid).first()
+    if not check or not check2:
         abort(403)
         return
     if request.method == "GET":
-        categories = Category.query.filter_by(menuId=mid).all()
+        categories = Category.query.filter_by(mid=mid).all()
         return render_template("Menu/Category/addOrMod.htm", user=user, mid=mid, categories=categories)
     else:
         name = request.form.get('name')
-        if request.form.get('subcategoryCheck'):
+        if int(cid) != 0:
             subcategory = request.form.get('subcategorySelect')
-            newCat = Category(name=name, parentId=int(subcategory))
+            newCat = Category(name=name, parentId=cid)
         else:
             newCat = Category(name=name, menuId=mid)
         db.session.add(newCat)
         db.session.commit()
-        return redirect(url_for("page_menu_details", mid=mid))
+        response = """
+        <li id=l{}>
+        <div class="collapsible-header" onclick="loadData({})"><i class="material-icons">filter_drama</i>{}</div>
+        <div class="collapsible-body" id=c{}></div>
+        </li>
+        """.format(newCat.cid, newCat.cid, newCat.name, newCat.cid)
+        return response
 
 
 @app.route("/restaurant/<int:rid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
@@ -472,18 +477,31 @@ def page_dish_add(rid):
     return redirect(url_for("page_restaurant_management"), rid=rid)
 
 
-@app.route("/menu/category/<int:cid>/getComponents")
+@app.route("/menu/category/<int:cid>/getComponents", methods=["POST"])
 def page_menu_get_components(cid):
-    subcats = Category.query.filter_by(parentId=cid).order_by(Category.name).all()
-    dishes = Plate.query.filter_by(category_id=cid).order_by(Plate.name).all()
-    response = {'subcats': [], 'dishes': []}
-    for cat in subcats:  # Meow, I'm underwater!
-        temp = {'name': cat.name, 'cid': cat.cid}
-        # Purr purr
-        response['subcats'].append(temp)
+    categories = Category.query.filter_by(parentId=cid).all()
+    dishes = CategoryAssociation.query.join(Plate).filter(CategoryAssociation.categoryId == cid).all()
+    response = """
+    <div class="row">
+	<div class="col s12 m12">
+    <ul class="collapsible" id=l{} data-collapsible="accordion"> """.format(cid)
+    for category in categories:
+        response += """
+                <li id=l{}>
+                <div class="collapsible-header" onclick="loadData({})"><i class="material-icons">filter_drama</i>{}</div>
+                <div class="collapsible-body" id=c{}></div>
+                </li>
+                """.format(category.cid, category.cid, category.name, category.cid)
+    response += "</ul> <ul class =\"collection\" id=p{}>".format(cid)
     for dish in dishes:
-        temp = {'name': dish.name, 'description': dish.description, 'ingredients': dish.ingredients, 'cost': dish.cost}
-        response['dishes'].append(temp)
+        response += """
+        <li class="collection-item avatar" id=pl{}>
+        <span class="title"> {} </span>
+        <p> {} <br> {} </p>
+        <a class="secondary-content"> {} €</a>
+        </li> 
+        """.format(dish.plate.pid, dish.plate.name, dish.plate.description, dish.plate.ingredients, dish.plate.cost)
+    response += " </div></div></ul>"
     return response
 
 
