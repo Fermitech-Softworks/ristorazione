@@ -2,23 +2,34 @@
 {% block title %}{{ gettext("Menu details") }}{% endblock %}
 {% block extrahead %}
     <script>
-
         $(document).ready(function () {
             $('.modal').modal();
         });
 
-        function addCat(cid, mid) {
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function addCat(cid, mid) {
             let xhr = new XMLHttpRequest();
+            await sleep(1000)
             refUl = document.getElementById("l" + cid)
+            console.log("l" + cid)
             if (cid === 0) {
                 input = document.getElementById("topLevelCatName")
+            } else {
+                input = document.getElementById(cid + "LevelCatName")
             }
             errBox = document.getElementById("error")
             errBox.innerHTML = ""
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        refUl.innerHTML = refUl.innerHTML + xhr.responseText
+                        if (cid === 0) {
+                            refUl.innerHTML = refUl.innerHTML + xhr.responseText
+                        } else {
+                            loadData(cid)
+                        }
                     } else {
                         errBox.innerHTML = xhr.statusText
                     }
@@ -42,12 +53,13 @@
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
                         refDiv.innerHTML = xhr.responseText
+                        $('.modal').modal();
                     } else {
                         errBox.innerHTML = xhr.statusText
                     }
                 }
             });
-            xhr.open("POST", "/menu/category/" + cid + "/getComponents", true);
+            xhr.open("POST", "/menu/" + {{menu.mid}}+"/category/" + cid + "/getComponents", true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
             xhr.send()
         }

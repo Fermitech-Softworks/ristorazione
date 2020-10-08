@@ -477,21 +477,38 @@ def page_dish_add(rid):
     return redirect(url_for("page_restaurant_management"), rid=rid)
 
 
-@app.route("/menu/category/<int:cid>/getComponents", methods=["POST"])
-def page_menu_get_components(cid):
+@app.route("/menu/<int:mid>/category/<int:cid>/getComponents", methods=["POST"])
+def page_menu_get_components(mid, cid):
     categories = Category.query.filter_by(parentId=cid).all()
     dishes = CategoryAssociation.query.join(Plate).filter(CategoryAssociation.categoryId == cid).all()
     response = """
     <div class="row">
 	<div class="col s12 m12">
-    <ul class="collapsible" id=l{} data-collapsible="accordion"> """.format(cid)
+	<a class="waves-effect waves-light btn modal-trigger" href="#{}LevelModal">Add a category</a>
+	<div id="{}LevelModal" class="modal">
+                    <div class="modal-content">
+                        <h4>Add a category</h4>
+                        <input id="{}LevelCatName" name="topLevelCatName">
+                        <label for="{}LevelCatName">Category Name</label>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-close waves-effect waves-green btn-flat" onclick="addCat({}, {})">Add
+                        </button>
+                    </div>
+                </div>
+    <ul class="collapsible" id=l{} data-collapsible="accordion"> 
+                    """.format(cid, cid, cid, cid ,cid, mid, cid)
     for category in categories:
         response += """
                 <li id=l{}>
                 <div class="collapsible-header" onclick="loadData({})"><i class="material-icons">filter_drama</i>{}</div>
-                <div class="collapsible-body" id=c{}></div>
+                <div class="collapsible-body" id=c{}>
+                    <ul class="collapsible" id=l{} data-collapsible="accordion">
+                    </ul>
+                </div>
                 </li>
-                """.format(category.cid, category.cid, category.name, category.cid)
+
+                """.format(category.cid, category.cid, category.name, category.cid, cid)
     response += "</ul> <ul class =\"collection\" id=p{}>".format(cid)
     for dish in dishes:
         response += """
@@ -501,7 +518,7 @@ def page_menu_get_components(cid):
         <a class="secondary-content"> {} €</a>
         </li> 
         """.format(dish.plate.pid, dish.plate.name, dish.plate.description, dish.plate.ingredients, dish.plate.cost)
-    response += " </div></div></ul>"
+    response += """ </div></div></ul>"""
     return response
 
 
