@@ -477,7 +477,33 @@ def page_dish_add(rid):
     return redirect(url_for("page_restaurant_management"), rid=rid)
 
 
-@app.route("/menu/<int:mid>/category/<int:cid>/getComponents", methods=["POST"])
+@app.route("/restaurant/<int:rid>/dish/get", methods=['POST'])
+def page_dish_get(rid):
+    dishes = Plate.query.filter_by(restaurant_id=rid).all()
+    catid = request.form.get('cid')
+    response = """
+    <select class="browser-default" name="ps{}" id="ps{}">""".format(catid, catid)
+    for dish in dishes:
+        response+="""<option value="{}">{}</option>""".format(dish.pid, dish.name)
+    response += """<label for="ps{}"> Choose a dish: </label></select>""".format(catid)
+    return response
+
+@app.route("/restaurant/<int:rid>/menu/<int:mid>/dish/add/<int:cid>", methods=["POST"])
+def page_dish_add_menu(rid, mid, cid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    plateid = request.form.get('pid')
+    check2 = Plate.query.filter_by(restaurant_id=rid, pid=plateid).first()
+    if not check and not check2:
+        abort(403)
+        return
+    newCat = CategoryAssociation(plateId=plateid, categoryId=cid)
+    db.session.add(newCat)
+    db.session.commit()
+    return "200 success"
+
+
+@app.route("/menu/<int:mid>/category/<int:cid>/getComponents", methods=["POST"]) #I hate this. One day, I will burn this mess to ground.
 def page_menu_get_components(mid, cid):
     categories = Category.query.filter_by(parentId=cid).all()
     dishes = CategoryAssociation.query.join(Plate).filter(CategoryAssociation.categoryId == cid).all()
@@ -496,8 +522,19 @@ def page_menu_get_components(mid, cid):
                         </button>
                     </div>
                 </div>
+    <a class="waves-effect waves-light btn modal-trigger" href="#{}LevelDish" onclick="getDishes({})">Add a dish</a>
+    <div id="{}LevelDish" class="modal">
+                    <div class="modal-content">
+                        <h4>Add a dish</h4>
+                        <div id="{}PlateSelect"> </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="modal-close waves-effect waves-green btn-flat" onclick="addDish({}, {})">Add
+                        </button>
+                    </div>
+                </div>
     <ul class="collapsible" id=l{} data-collapsible="accordion"> 
-                    """.format(cid, cid, cid, cid ,cid, mid, cid)
+                    """.format(cid, cid, cid, cid ,cid, mid, cid, cid, cid, cid, cid, mid, cid)
     for category in categories:
         response += """
                 <li id=l{}>

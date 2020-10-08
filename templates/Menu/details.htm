@@ -5,9 +5,35 @@
         $(document).ready(function () {
             $('.modal').modal();
         });
+        $(document).ready(function () {
+            $('select').formSelect();
+        });
 
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function addDish(cid, mid) {
+            let xhr = new XMLHttpRequest();
+            await sleep(1000)
+            refUl = document.getElementById("l" + cid)
+            console.log("l" + cid)
+            input = document.getElementById(cid + "LevelDishName")
+            errBox = document.getElementById("error")
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        loadData(cid)
+                    } else {
+                        errBox.innerHTML = xhr.statusText
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/dish/add/" + cid, true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            let parametri = "plateId=" + input.value;
+            xhr.send(parametri)
         }
 
         async function addCat(cid, mid) {
@@ -38,6 +64,53 @@
             xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/category/add/" + cid, true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
             let parametri = "name=" + input.value;
+            xhr.send(parametri)
+        }
+
+        async function addDish(cid, mid) {
+            let xhr = new XMLHttpRequest();
+            await sleep(1000)
+            console.log("ps" + cid)
+            input = document.getElementById("ps"+cid)
+            errBox = document.getElementById("error")
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        loadData(cid)
+                    } else {
+                        errBox.innerHTML = xhr.statusText
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/dish/add/" + cid, true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            let parametri = "pid=" + input.value;
+            xhr.send(parametri)
+        }
+
+
+        function getDishes(cid) {
+            $('.collapsible').collapsible();
+            console.log("Sent request by plate explorer number " + cid)
+            let xhr = new XMLHttpRequest();
+            var refDiv = document.getElementById(cid + "PlateSelect")
+            errBox = document.getElementById("error")
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        refDiv.innerHTML = xhr.responseText
+                        var elems = document.querySelectorAll('select');
+                        var instances = M.FormSelect.init(elems, "");
+                    } else {
+                        errBox.innerHTML = xhr.statusText
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/"+{{ rid }}+"/dish/get", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            parametri = "cid=" + cid
             xhr.send(parametri)
         }
 
