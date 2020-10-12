@@ -8,6 +8,9 @@
         $(document).ready(function () {
             $('select').formSelect();
         });
+        $(document).ready(function () {
+            $('.collapsible').collapsible();
+        });
 
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
@@ -24,7 +27,7 @@
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        loadData(cid)
+                        loadData(cid, mid)
                     } else {
                         errBox.innerHTML = xhr.statusText
                     }
@@ -54,7 +57,7 @@
                         if (cid === 0) {
                             refUl.innerHTML = refUl.innerHTML + xhr.responseText
                         } else {
-                            loadData(cid)
+                            loadData(cid, mid)
                         }
                     } else {
                         errBox.innerHTML = xhr.statusText
@@ -71,13 +74,13 @@
             let xhr = new XMLHttpRequest();
             await sleep(1000)
             console.log("ps" + cid)
-            input = document.getElementById("ps"+cid)
+            input = document.getElementById("ps" + cid)
             errBox = document.getElementById("error")
             errBox.innerHTML = ""
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        loadData(cid)
+                        loadData(cid, mid)
                     } else {
                         errBox.innerHTML = xhr.statusText
                     }
@@ -100,7 +103,19 @@
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        refDiv.innerHTML = xhr.responseText
+                        refDiv.innerHTML = ""
+                        response = JSON.parse(xhr.responseText);
+                        var select = document.createElement("select");
+                        select.className = "browser-default";
+                        select.name = "ps"+cid;
+                        select.id = "ps"+cid;
+                        refDiv.appendChild(select);
+                        for(const dish of response['response']){
+                            var option = document.createElement("option");
+                            option.value=dish['pid'];
+                            option.textContent=dish['name'];
+                            select.appendChild(option);
+                        }
                         var elems = document.querySelectorAll('select');
                         var instances = M.FormSelect.init(elems, "");
                     } else {
@@ -115,8 +130,8 @@
         }
 
 
-        function loadData(cid) {
-            $('.collapsible').collapsible();
+        function loadData(cid, mid) {
+
             console.log("Sent request by subordinate of " + cid)
             let xhr = new XMLHttpRequest();
             refDiv = document.getElementById("c" + cid)
@@ -125,8 +140,125 @@
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        refDiv.innerHTML = xhr.responseText
+                        refDiv.innerHTML = ""
+                        response = xhr.responseText
+                        response = JSON.parse(response)
+                        categories = response["response"]["categories"]
+                        dishes = response["response"]["dishes"]
+                        console.log(dishes)
+                        console.log(categories)
+                        // Panel setup
+                        var row = document.createElement("div");
+                        row.setAttribute("class", "row")
+                        refDiv.appendChild(row)
+                        var column = document.createElement("div");
+                        column.setAttribute("class", "col s12 m12");
+                        row.appendChild(column)
+                        var addcatButton = document.createElement("a");
+                        addcatButton.setAttribute("class", "waves-effect waves-light btn modal-trigger")
+                        addcatButton.setAttribute("href", "#" + cid + "LevelModal")
+                        addcatButton.text = "Add a category";
+                        column.appendChild(addcatButton)
+                        var addDishButton = document.createElement("a");
+                        addDishButton.setAttribute("class", "waves-effect waves-light btn modal-trigger")
+                        addDishButton.setAttribute("href", "#" + cid + "LevelDish")
+                        addDishButton.setAttribute("onclick", "getDishes(" + cid + ")")
+                        addDishButton.text = "Add a dish";
+                        column.appendChild(addDishButton);
+                        // Modals
+                        var catModalDiv = document.createElement("div");
+                        catModalDiv.setAttribute("id", cid + "LevelModal");
+                        catModalDiv.setAttribute("class", "modal");
+                        column.appendChild(catModalDiv);
+                        var catModalContentDiv = document.createElement("div");
+                        catModalContentDiv.setAttribute("class", "modal-content")
+                        catModalDiv.appendChild(catModalContentDiv);
+                        var catModalGuide = document.createElement("h4")
+                        catModalGuide.textContent = "Add a category";
+                        catModalContentDiv.appendChild(catModalGuide);
+                        var catModalName = document.createElement("input")
+                        catModalName.setAttribute("id", cid + "LevelCatName");
+                        catModalName.setAttribute("name", "topLevelCatName");
+                        catModalContentDiv.appendChild(catModalName);
+                        var catModalLabel = document.createElement("label")
+                        catModalLabel.setAttribute("for", cid + "LevelCatName");
+                        catModalLabel.textContent = "Category Name";
+                        catModalContentDiv.appendChild(catModalLabel);
+                        var catModalFooter = document.createElement("div");
+                        catModalFooter.setAttribute("class", "modal-footer");
+                        catModalDiv.appendChild(catModalFooter);
+                        var catButton = document.createElement("button");
+                        catButton.setAttribute("class", "modal-close waves-effect waves-green btn-flat")
+                        catButton.setAttribute("onclick", "addCat(" + cid + "," + mid + ")")
+                        catButton.textContent = "Save"
+                        catModalFooter.appendChild(catButton);
+
+                        var dishModalDiv = document.createElement("div");
+                        dishModalDiv.setAttribute("id", cid + "LevelDish");
+                        dishModalDiv.setAttribute("class", "modal");
+                        column.appendChild(dishModalDiv);
+                        var dishModalContentDiv = document.createElement("div");
+                        dishModalContentDiv.setAttribute("class", "modal-content")
+                        dishModalDiv.appendChild(dishModalContentDiv);
+                        var dishModalGuide = document.createElement("h4")
+                        dishModalGuide.textContent = "Add a dish";
+                        dishModalContentDiv.appendChild(dishModalGuide);
+                        var dishModalSelect = document.createElement("div")
+                        dishModalSelect.setAttribute("id", cid + "PlateSelect");
+                        dishModalContentDiv.appendChild(dishModalSelect);
+                        var dishModalLabel = document.createElement("label")
+                        dishModalLabel.setAttribute("for", cid + "PlateSelect");
+                        dishModalLabel.textContent = "Choose a dish...";
+                        dishModalContentDiv.appendChild(dishModalLabel);
+                        var dishModalFooter = document.createElement("div");
+                        dishModalFooter.setAttribute("class", "modal-footer");
+                        dishModalDiv.appendChild(dishModalFooter);
+                        var dishButton = document.createElement("button");
+                        dishButton.setAttribute("class", "modal-close waves-effect waves-green btn-flat")
+                        dishButton.setAttribute("onclick", "addDish(" + cid + "," + mid + ")")
+                        dishButton.textContent = "Save"
+                        dishModalFooter.appendChild(dishButton);
                         $('.modal').modal();
+                        // Main content setup
+                        var catMasterUl = document.createElement("ul");
+                        catMasterUl.setAttribute("class", "collapsible");
+                        catMasterUl.setAttribute("id", "l" + cid);
+                        catMasterUl.setAttribute("data-collapsible", "accordion");
+                        column.appendChild(catMasterUl);
+                        // Categories
+                        for (const cat of categories) {
+                            var catLi = document.createElement("li");
+                            catLi.setAttribute("id", "l" + cat['cid']);
+                            catMasterUl.appendChild(catLi);
+                            var collapseHeader = document.createElement("div");
+                            collapseHeader.setAttribute("class", "collapsible-header");
+                            collapseHeader.setAttribute("onclick", "loadData(" + cat['cid'] + "," + mid + ")")
+                            collapseHeader.textContent = cat['name']
+                            catLi.appendChild(collapseHeader)
+                            var collapseBody = document.createElement("div")
+                            collapseBody.setAttribute("id", "c" + cat['cid'])
+                            collapseBody.setAttribute("class", "collapsible-body")
+                            catLi.appendChild(collapseBody)
+                            $('.collapsible').collapsible();
+                        }
+                        var dishMasterUl = document.createElement("ul");
+                        dishMasterUl.setAttribute("class", "collection");
+                        dishMasterUl.setAttribute("id", "p"+cid);
+                        column.appendChild(dishMasterUl);
+                        for (const dish of dishes){
+                            var dishLi = document.createElement("li");
+                            dishLi.setAttribute("id", "l"+dish['pid'])
+                            dishLi.className = "collection-item avatar"
+                            dishMasterUl.appendChild(dishLi);
+                            var dishName = document.createElement("span")
+                            dishName.textContent = dish['name'];
+                            dishName.className = "title";
+                            dishLi.appendChild(dishName);
+                            var dishDesc = document.createElement("p");
+                            dishDesc.textContent = dish['description']+", "+dish['ingredients']+". "+dish['cost']+"€";
+                            dishLi.appendChild(dishDesc);
+                        }
+
                     } else {
                         errBox.innerHTML = xhr.statusText
                     }
@@ -145,7 +277,7 @@
     <ul class="collapsible" id="l0" data-collapsible="accordion">
         {% for cat in menu.topLevelCategories %}
             <li>
-                <div class="collapsible-header" onclick="loadData({{ cat.cid }})"><i
+                <div class="collapsible-header" onclick="loadData({{ cat.cid }}, {{ menu.mid }})"><i
                         class="material-icons">filter_drama</i>{{ cat.name }}</div>
                 <div class="collapsible-body" id="c{{ cat.cid }}"></div>
             </li>
