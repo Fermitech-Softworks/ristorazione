@@ -118,6 +118,9 @@ class Category(db.Model):
     children = db.relationship("Category", backref=db.backref('parent', remote_side=[cid]))
     plates = db.relationship("CategoryAssociation", back_populates="category")
 
+    def toJson(self):
+        return {'cid':self.cid, 'name':self.name}
+
 
 class Plate(db.Model):
     __tablename__ = "plate"
@@ -130,6 +133,9 @@ class Plate(db.Model):
     order = db.relationship("Order", back_populates="plate")
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="ownedPlates")
+
+    def toJson(self):
+        return {'pid':self.pid, 'name':self.name, 'description': self.description, 'ingredients':self.ingredients, 'cost':self.cost}
 
 
 class CategoryAssociation(db.Model):
@@ -449,13 +455,7 @@ def page_category_add(rid, mid, cid):
             newCat = Category(name=name, menuId=mid)
         db.session.add(newCat)
         db.session.commit()
-        response = """
-        <li id=l{}>
-        <div class="collapsible-header" onclick="loadData({})"><i class="material-icons">filter_drama</i>{}</div>
-        <div class="collapsible-body" id=c{}></div>
-        </li>
-        """.format(newCat.cid, newCat.cid, newCat.name, newCat.cid)
-        return response
+        return "200 success"
 
 
 @app.route("/restaurant/<int:rid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
@@ -481,11 +481,10 @@ def page_dish_add(rid):
 def page_dish_get(rid):
     dishes = Plate.query.filter_by(restaurant_id=rid).all()
     catid = request.form.get('cid')
-    response = """
-    <select class="browser-default" name="ps{}" id="ps{}">""".format(catid, catid)
+    dishlist = []
     for dish in dishes:
-        response+="""<option value="{}">{}</option>""".format(dish.pid, dish.name)
-    response += """<label for="ps{}"> Choose a dish: </label></select>""".format(catid)
+        dishlist.append(dish.toJson())
+    response={'response':dishlist}
     return response
 
 @app.route("/restaurant/<int:rid>/menu/<int:mid>/dish/add/<int:cid>", methods=["POST"])
@@ -503,59 +502,17 @@ def page_dish_add_menu(rid, mid, cid):
     return "200 success"
 
 
-@app.route("/menu/<int:mid>/category/<int:cid>/getComponents", methods=["POST"]) #I hate this. One day, I will burn this mess to ground.
+@app.route("/menu/<int:mid>/category/<int:cid>/getComponents", methods=["POST"])
 def page_menu_get_components(mid, cid):
     categories = Category.query.filter_by(parentId=cid).all()
     dishes = CategoryAssociation.query.join(Plate).filter(CategoryAssociation.categoryId == cid).all()
-    response = """
-    <div class="row">
-	<div class="col s12 m12">
-	<a class="waves-effect waves-light btn modal-trigger" href="#{}LevelModal">Add a category</a>
-	<div id="{}LevelModal" class="modal">
-                    <div class="modal-content">
-                        <h4>Add a category</h4>
-                        <input id="{}LevelCatName" name="topLevelCatName">
-                        <label for="{}LevelCatName">Category Name</label>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="modal-close waves-effect waves-green btn-flat" onclick="addCat({}, {})">Add
-                        </button>
-                    </div>
-                </div>
-    <a class="waves-effect waves-light btn modal-trigger" href="#{}LevelDish" onclick="getDishes({})">Add a dish</a>
-    <div id="{}LevelDish" class="modal">
-                    <div class="modal-content">
-                        <h4>Add a dish</h4>
-                        <div id="{}PlateSelect"> </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="modal-close waves-effect waves-green btn-flat" onclick="addDish({}, {})">Add
-                        </button>
-                    </div>
-                </div>
-    <ul class="collapsible" id=l{} data-collapsible="accordion"> 
-                    """.format(cid, cid, cid, cid ,cid, mid, cid, cid, cid, cid, cid, mid, cid)
-    for category in categories:
-        response += """
-                <li id=l{}>
-                <div class="collapsible-header" onclick="loadData({})"><i class="material-icons">filter_drama</i>{}</div>
-                <div class="collapsible-body" id=c{}>
-                    <ul class="collapsible" id=l{} data-collapsible="accordion">
-                    </ul>
-                </div>
-                </li>
-
-                """.format(category.cid, category.cid, category.name, category.cid, cid)
-    response += "</ul> <ul class =\"collection\" id=p{}>".format(cid)
+    catlist = []
+    dishlist = []
+    for cat in categories:
+        catlist.append(cat.toJson())
     for dish in dishes:
-        response += """
-        <li class="collection-item avatar" id=pl{}>
-        <span class="title"> {} </span>
-        <p> {} <br> {} </p>
-        <a class="secondary-content"> {} €</a>
-        </li> 
-        """.format(dish.plate.pid, dish.plate.name, dish.plate.description, dish.plate.ingredients, dish.plate.cost)
-    response += """ </div></div></ul>"""
+        dishlist.append(dish.plate.toJson())
+    response = {'response':{'categories':catlist, 'dishes':dishlist}}
     return response
 
 
