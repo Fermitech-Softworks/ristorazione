@@ -1,0 +1,128 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Tables") }}{% endblock %}
+{% block extrahead %}
+    <script>
+        $(document).ready(function () {
+            $('.modal').modal();
+        });
+
+        function getToken(tid, rid) {
+            let xhr = new XMLHttpRequest();
+            refDiv = document.getElementById("token" + tid)
+            refDiv.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        response = JSON.parse(xhr.responseText);
+                        refDiv.innerText = response['token']
+                        refDiv.style = "font-family: consolas; font-size: 150%";
+                    }
+                }
+            });
+            xhr.open("POST", "/table/" + tid + "/getToken", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            var parametri = "rid=" + rid
+            xhr.send(parametri);
+        }
+
+        function getOrders(tid, rid) {
+            let xhr = new XMLHttpRequest();
+            refUl = document.getElementById("orders" + tid)
+            refUl.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var response = JSON.parse(xhr.responseText);
+                        for (const o of response['orders']) {
+                            var newLi = document.createElement("li")
+                            newLi.className = "collection-item";
+                            refUl.appendChild(newLi)
+                            var internalDiv = document.createElement("div");
+                            internalDiv.innerText = o['name'] + " x" + o['qty'] + ", for each " + o['cost'] + "€.";
+                            newLi.appendChild(internalDiv);
+                        }
+                    }
+                }
+            });
+            xhr.open("POST", "/table/" + tid + "/getOrders", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            var parametri = "rid=" + rid
+            xhr.send(parametri);
+        }
+
+        function prepareModal(tid, rid) {
+            getToken(tid, rid)
+            getOrders(tid, rid)
+        }
+
+        function closeTable(tid, rid) {
+            let xhr = new XMLHttpRequest();
+            refUl = document.getElementById("orders" + tid)
+            refUl.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var response = JSON.parse(xhr.responseText);
+                        console.log(response)
+                        var mwindow = window.open("", "Recap", "width=800,height=600")
+                        for (const o of response['orders']) {
+                            mwindow.document.write("<p>"+o['name']+" x"+o['qty']+" , "+o['cost']+"€"+"</p>")
+                        }
+                        mwindow.print()
+                        prepareModal(tid, rid)
+                    }
+                }
+            });
+            xhr.open("POST", "/table/" + tid + "/close", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            var parametri = "rid=" + rid
+            xhr.send(parametri);
+        }
+
+    </script>
+{% endblock %}
+{% block content %}
+    <h5>{{ gettext("This is the table and order management page.") }}</h5>
+    <div class="row">
+        <div class="col s12 m6">
+            <ul class="collection with-header">
+                <li class="collection-header"><h4>Tables</h4></li>
+                {% for table in tables %}
+                    <li class="collection-item">
+                        <div>{{ gettext("Table") }} {{ table.tid + 1 }}
+                            <a href="" data-target="modal{{ table.tid }}" class="secondary-content modal-trigger"
+                               onclick="prepareModal({{ table.tid }}, {{ table.restaurantId }})"><i
+                                    class="material-icons">search</i>
+                            </a>
+                        </div>
+                        <div id="modal{{ table.tid }}" class="modal">
+                            <div class="modal-content">
+                                <h4>{{ gettext("Table number") }} {{ table.tid + 1 }}</h4>
+                                <div class="row">
+                                    <div class="col s12 m6">
+                                        <p>{{ gettext("The current token is ") }}
+                                        <div id="token{{ table.tid }}"></div>
+                                        </p>
+                                        <a href="#" onclick="closeTable({{ table.tid }}, {{ table.restaurantId }})"
+                                           class="waves-effect waves-light btn">Sign-off table</a>
+                                    </div>
+                                    <div class="col s12 m6">
+                                        <p>{{ gettext("List of orders. ") }}<a href="#"
+                                                                               onclick="getOrders({{ table.tid }}, {{ table.restaurantId }})">{{ gettext("Click here to refresh.") }}</a>
+                                        </p>
+                                        <ul class="collection" id="orders{{ table.tid }}">
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <a href="#!"
+                                   class="modal-close waves-effect waves-green btn-flat">{{ gettext("Close") }}</a>
+                            </div>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}

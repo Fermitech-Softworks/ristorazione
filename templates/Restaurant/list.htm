@@ -11,11 +11,10 @@
     <div style="color: #fafafa">
         <h2>{% if mode == "search" %}{{ gettext("Here's the result of the search:") }}{% endif %}</h2>
     </div>
-    <ul class="collapsible">
+    <ul class="collection">
         {% for restaurant in restaurants %}
-            <li>
-                <div class="collapsible-header">{{ restaurant[0].name }}</div>
-                <div class="collapsible-body"><span>Lorem ipsum dolor sit amet.</span></div>
+            <li class="collection-item">
+                <div>{{ restaurant[0].name }}, {{ restaurant[0].state }}, {{ restaurant[0].address }} {{ restaurant[0].city }}<a href="/restaurant/{{ restaurant[0].rid }}/info" class="secondary-content"><i class="material-icons">send</i></a></div>
             </li>
         {% endfor %}
     </ul>

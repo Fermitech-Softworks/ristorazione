@@ -1,5 +1,5 @@
 {% extends "stampo.htm" %}
-{% block title %}{{ gettext("Menu details") }}{% endblock %}
+{% block title %}{{ menu.name }}{% endblock %}
 {% block extrahead %}
     <script>
         $(document).ready(function () {
@@ -16,122 +16,7 @@
             return new Promise(resolve => setTimeout(resolve, ms));
         }
 
-        async function addDish(cid, mid) {
-            let xhr = new XMLHttpRequest();
-            await sleep(1000)
-            refUl = document.getElementById("l" + cid)
-            console.log("l" + cid)
-            input = document.getElementById(cid + "LevelDishName")
-            errBox = document.getElementById("error")
-            errBox.innerHTML = ""
-            xhr.addEventListener("readystatechange", function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        loadData(cid, mid)
-                    } else {
-                        errBox.innerHTML = xhr.statusText
-                    }
-                }
-            });
-            xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/dish/add/" + cid, true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            let parametri = "plateId=" + input.value;
-            xhr.send(parametri)
-        }
-
-        async function addCat(cid, mid) {
-            let xhr = new XMLHttpRequest();
-            await sleep(1000)
-            refUl = document.getElementById("l" + cid)
-            console.log("l" + cid)
-            if (cid === 0) {
-                input = document.getElementById("topLevelCatName")
-            } else {
-                input = document.getElementById(cid + "LevelCatName")
-            }
-            errBox = document.getElementById("error")
-            errBox.innerHTML = ""
-            xhr.addEventListener("readystatechange", function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        if (cid === 0) {
-                            location.reload()
-                        } else {
-                            loadData(cid, mid)
-                        }
-                    } else {
-                        errBox.innerHTML = xhr.statusText
-                    }
-                }
-            });
-            xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/category/add/" + cid, true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            let parametri = "name=" + input.value;
-            xhr.send(parametri)
-        }
-
-        async function addDish(cid, mid) {
-            let xhr = new XMLHttpRequest();
-            await sleep(1000)
-            console.log("ps" + cid)
-            input = document.getElementById("ps" + cid)
-            errBox = document.getElementById("error")
-            errBox.innerHTML = ""
-            xhr.addEventListener("readystatechange", function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        loadData(cid, mid)
-                    } else {
-                        errBox.innerHTML = xhr.statusText
-                    }
-                }
-            });
-            xhr.open("POST", "/restaurant/{{ rid }}/menu/" + mid + "/dish/add/" + cid, true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            let parametri = "pid=" + input.value;
-            xhr.send(parametri)
-        }
-
-
-        function getDishes(cid) {
-            $('.collapsible').collapsible();
-            console.log("Sent request by plate explorer number " + cid)
-            let xhr = new XMLHttpRequest();
-            var refDiv = document.getElementById(cid + "PlateSelect")
-            errBox = document.getElementById("error")
-            errBox.innerHTML = ""
-            xhr.addEventListener("readystatechange", function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        refDiv.innerHTML = ""
-                        response = JSON.parse(xhr.responseText);
-                        var select = document.createElement("select");
-                        select.className = "browser-default";
-                        select.name = "ps"+cid;
-                        select.id = "ps"+cid;
-                        refDiv.appendChild(select);
-                        for(const dish of response['response']){
-                            var option = document.createElement("option");
-                            option.value=dish['pid'];
-                            option.textContent=dish['name'];
-                            select.appendChild(option);
-                        }
-                        var elems = document.querySelectorAll('select');
-                        var instances = M.FormSelect.init(elems, "");
-                    } else {
-                        errBox.innerHTML = xhr.statusText
-                    }
-                }
-            });
-            xhr.open("POST", "/restaurant/"+{{ rid }}+"/dish/get", true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            parametri = "cid=" + cid
-            xhr.send(parametri)
-        }
-
-
         function loadData(cid, mid) {
-
             console.log("Sent request by subordinate of " + cid)
             let xhr = new XMLHttpRequest();
             refDiv = document.getElementById("c" + cid)
@@ -148,23 +33,7 @@
                         console.log(dishes)
                         console.log(categories)
                         // Panel setup
-                        var row = document.createElement("div");
-                        row.setAttribute("class", "row")
-                        refDiv.appendChild(row)
-                        var column = document.createElement("div");
-                        column.setAttribute("class", "col s12 m12");
-                        row.appendChild(column)
-                        var addcatButton = document.createElement("a");
-                        addcatButton.setAttribute("class", "waves-effect waves-light btn modal-trigger")
-                        addcatButton.setAttribute("href", "#" + cid + "LevelModal")
-                        addcatButton.text = "Add a category";
-                        column.appendChild(addcatButton)
-                        var addDishButton = document.createElement("a");
-                        addDishButton.setAttribute("class", "waves-effect waves-light btn modal-trigger")
-                        addDishButton.setAttribute("href", "#" + cid + "LevelDish")
-                        addDishButton.setAttribute("onclick", "getDishes(" + cid + ")")
-                        addDishButton.text = "Add a dish";
-                        column.appendChild(addDishButton);
+                        var column = refDiv;
                         // Modals
                         var catModalDiv = document.createElement("div");
                         catModalDiv.setAttribute("id", cid + "LevelModal");
@@ -238,6 +107,7 @@
                             var collapseBody = document.createElement("div")
                             collapseBody.setAttribute("id", "c" + cat['cid'])
                             collapseBody.setAttribute("class", "collapsible-body")
+                            collapseBody.style = "padding-top: 1rem; padding-bottom: 1rem; padding-left: 5px; padding-right: 5px";
                             catLi.appendChild(collapseBody)
                             $('.collapsible').collapsible();
                         }
@@ -271,16 +141,14 @@
     </script>
 {% endblock %}
 {% block content %}
-    <h5>{{ gettext("You are currently editing the menu ") }}"{{ menu.name }}"</h5>
-    <a class="waves-effect waves-light btn modal-trigger" href="#topLevelModal">Add a top-level category</a>
-    <a href="/restaurant/{{ rid }}/management#menus" class="btn waves-effect waves-light" type="submit" name="action">{{ gettext("Return to the management panel") }} <i class="material-icons right">exit_to_app</i></a>
+    <h5>{{ gettext("You are inspecting ") }}"{{ menu.name }}"</h5>
+    <a href="/restaurant/{{ rid }}/info" class="btn waves-effect waves-light" type="submit" name="action">{{ gettext("Return to the restaurant") }} <i class="material-icons right">exit_to_app</i></a>
     <div id="error"></div>
     <ul class="collapsible" id="l0" data-collapsible="accordion">
         {% for cat in menu.topLevelCategories %}
             <li>
-                <div class="collapsible-header" onclick="loadData({{ cat.cid }}, {{ menu.mid }})"><i
-                        class="material-icons">filter_drama</i>{{ cat.name }}</div>
-                <div class="collapsible-body" id="c{{ cat.cid }}"></div>
+                <div class="collapsible-header" onclick="loadData({{ cat.cid }}, {{ menu.mid }})">{{ cat.name }}</div>
+                <div class="collapsible-body" id="c{{ cat.cid }}" style="padding-top: 1rem; padding-bottom: 1rem; padding-left: 5px; padding-right: 5px"></div>
             </li>
         {% endfor %}
     </ul>

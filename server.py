@@ -8,6 +8,9 @@ import os
 import datetime
 import functools
 from fuzzywuzzy import process
+from flask_socketio import SocketIO, send, join_room, leave_room, emit, Namespace, disconnect
+import random
+import string
 
 import requests
 
@@ -23,6 +26,7 @@ app.secret_key = "testing"
 app.config['UPLOAD_FOLDER'] = "./static"
 ALLOWED_EXTENSIONS = set(['txt', 'md', 'pdf', 'doc', 'docx'])
 db = SQLAlchemy(app)
+socketio = SocketIO(app)
 
 
 # DB classes go beyond this point
@@ -87,7 +91,7 @@ class Table(db.Model):
     tid = db.Column(db.Integer, primary_key=True)
     restaurant = db.relationship("Restaurant", back_populates="tables")
     restaurantId = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), primary_key=True)
-    token = db.Column(db.String(10))
+    token = db.Column(db.String(6))
     order = db.relationship("Order", back_populates="table")
 
 
@@ -182,6 +186,14 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def createToken(table):
+    while True:
+        token = ''.join(random.choice("abcdefghijklmopqrstuvwxyz1234567890") for i in range(6))
+        check = Table.query.filter_by(token=token, restaurantId=table.restaurantId).first()
+        if not check:
+            return token
+
+
 # Decorators
 
 
@@ -190,6 +202,10 @@ def login_or_403(f):
     def func(*args, **kwargs):
         if not session.get("email"):
             abort(403)
+            try:
+                disconnect()
+            except Exception:
+                pass
             return
         return f(*args, **kwargs)
 
@@ -328,7 +344,14 @@ def page_restaurant_add():
     return redirect(url_for('page_dashboard'))
 
 
+@app.route("/restaurant/<int:rid>/info", methods=['GET', 'POST'])
+def page_restaurant_info(rid):
+    restaurant = Restaurant.query.get_or_404(rid)
+    return render_template("Restaurant/info.htm", restaurant=restaurant)
+
+
 @app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
+@login_or_403
 def page_restaurant_management(rid):
     user = find_user(session['email'])
     check = Work.query.filter_by(restaurantId=rid, userEmail=user.email).first()
@@ -340,6 +363,7 @@ def page_restaurant_management(rid):
 
 
 @app.route("/restaurant/<int:rid>/add_waiterOrOwner/<int:mode>", methods=['POST'])
+@login_or_403
 def page_restaurant_add_waiter_or_owner(rid, mode):
     user = find_user(session['email'])
     check = Work.query.filter_by(restaurantId=rid, userEmail=user.email, type=2).first()
@@ -361,6 +385,7 @@ def page_restaurant_add_waiter_or_owner(rid, mode):
 
 
 @app.route("/restaurant/<int:rid>/getOwners", methods=['POST'])
+@login_or_403
 def page_restaurant_get_owners(rid):
     user = find_user(session['email'])
     check = Work.query.filter_by(restaurantId=rid, userEmail=user.email, type=UserType.owner).first()
@@ -382,6 +407,7 @@ def page_restaurant_get_owners(rid):
 
 
 @app.route("/restaurant/<int:rid>/getWaiters", methods=['POST'])
+@login_or_403
 def page_restaurant_get_waiters(rid):
     user = find_user(session['email'])
     check = Work.query.filter_by(restaurantId=rid, userEmail=user.email, type=UserType.owner).first()
@@ -404,7 +430,8 @@ def page_restaurant_get_waiters(rid):
 
 # Todo: add a subscription check
 
-@app.route("/menu/add/<int:rid>", methods=['GET', 'POST'])  # Needs frontend!
+@app.route("/menu/add/<int:rid>", methods=['GET', 'POST'])
+@login_or_403
 def page_menu_add(rid):
     user = find_user(session['email'])
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
@@ -424,7 +451,16 @@ def page_menu_add(rid):
         return redirect(url_for("page_menu_details", mid=newMenu.mid))
 
 
-@app.route("/restaurant/<int:rid>/menu/details/<int:mid>", methods=['GET'])  # Needs frontend!
+@app.route("/restaurant/<int:rid>/menu/<int:mid>")
+def page_menu_inspect(rid, mid):
+    menu = Menu.query.get_or_404(mid)
+    if not menu.enabled:
+        abort(403)
+    return render_template("Menu/inspect.htm", menu=menu, rid=rid)
+
+
+@app.route("/restaurant/<int:rid>/menu/details/<int:mid>", methods=['GET'])
+@login_or_403
 def page_menu_details(rid, mid):
     user = find_user(session['email'])
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
@@ -436,6 +472,7 @@ def page_menu_details(rid, mid):
 
 
 @app.route("/restaurant/<int:rid>/menu/<int:mid>/category/add/<int:cid>", methods=['GET', 'POST'])
+@login_or_403
 def page_category_add(rid, mid, cid):
     user = find_user(session['email'])
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
@@ -458,7 +495,8 @@ def page_category_add(rid, mid, cid):
         return "200 success"
 
 
-@app.route("/restaurant/<int:rid>/dish/add", methods=['GET', 'POST'])  # Needs frontend!
+@app.route("/restaurant/<int:rid>/dish/add", methods=['GET', 'POST'])
+@login_or_403
 def page_dish_add(rid):
     user = find_user(session['email'])
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
@@ -488,6 +526,7 @@ def page_dish_get(rid):
     return response
 
 @app.route("/restaurant/<int:rid>/menu/<int:mid>/dish/add/<int:cid>", methods=["POST"])
+@login_or_403
 def page_dish_add_menu(rid, mid, cid):
     user = find_user(session['email'])
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
@@ -531,9 +570,94 @@ def page_search():
     return render_template("Restaurant/list.htm", restaurants=result, invert=True, mode="search")
 
 
+@app.route("/restaurant/<int:rid>/tables")
+@login_or_403
+def page_restaurant_tables(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        abort(403)
+    tables = Table.query.filter_by(restaurantId=rid).all()
+    return render_template("Restaurant/tables.htm", user=user, tables=tables)
+
+
+@app.route("/table/<int:tid>/getToken", methods=['POST'])
+@login_or_403
+def page_table_get_token(tid):
+    rid = request.form.get('rid')
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        abort(403)
+    table = Table.query.get_or_404((tid, rid))
+    return {'token':table.token}
+
+
+@app.route("/table/<int:tid>/getOrders", methods=['POST'])
+@login_or_403
+def page_table_get_orders(tid):
+    rid = request.form.get('rid')
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        abort(403)
+    table = Table.query.get_or_404((tid, rid))
+    response = {'orders':[]}
+    for order in table.order:
+        tmp = {'pid':order.plate.pid, 'name':order.plate.name, 'cost':order.plate.cost, 'qty':order.quantity}
+        response['orders'].append(tmp)
+    return response
+
+
+@app.route("/table/<int:tid>/close", methods=['POST'])
+@login_or_403
+def page_table_close(tid):
+    rid = request.form.get('rid')
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        abort(403)
+    table = Table.query.get_or_404((tid, rid))
+    response = {'orders':[]}
+    for order in table.order:
+        tmp = {'pid':order.plate.pid, 'name':order.plate.name, 'cost':order.plate.cost*order.quantity, 'qty':order.quantity}
+        response['orders'].append(tmp)
+        db.session.delete(order)
+    table.token = createToken(table)
+    db.session.commit()
+    return response
+
+
 @app.route("/about")
 def page_about():
     return render_template("about.htm")
+
+
+# Socket definitions go below
+
+@socketio.on('connectPersonnel')
+@login_or_403
+def connHandler(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        return
+    join_room(rid)
+
+
+@socketio.on('disconnectPersonnel')
+@login_or_403
+def disconnHandler(rid):
+    user = find_user(session['email'])
+    leave_room(rid)
+
+
+@socketio.on('newOrder')
+def orderHandler(json): #{'rid':rid, 'order':['tid':tid, 'token':token, 'plates':[]]}
+    check = Table.query.filter_by(restaurantId=json['rid'], tid=json['order']['tid'], token=json['order']['token']).first()
+    if not check:
+        return
+    emit(json['order']['plates'], room=json['rid'])
 
 
 if __name__ == "__main__":
@@ -549,4 +673,5 @@ if __name__ == "__main__":
         db.session.add(newUser)
         db.session.commit()
     print("The db is delicious!")
-    app.run(debug=True, host='0.0.0.0')
+    socketio.run(app, debug=True, host='0.0.0.0')
+
