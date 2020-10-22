@@ -16,15 +16,14 @@
                 <div class="row">
                     <div class="col s12 m6">
                         <ul class="collection">
-                            <form class="col s12">
+                            <form class="col s12" action="/restaurant/{{ restaurant.rid }}/tableLogin" method="POST">
                                 <div class="row">
                                     <div class="input-field col s6">
-                                        <input id="tableNumber" name="tableNumber" type="text"
-                                               class="validate">
-                                        <label for="first_name">Table Number</label>
+                                        <input id="tableNumber" name="tableId" type="text">
+                                        <label for="first_name">Table</label>
                                     </div>
                                     <div class="input-field col s6">
-                                        <input id="token" name="token" type="text" class="validate">
+                                        <input id="token" name="token" type="text">
                                         <label for="token">Token</label>
                                     </div>
                                 </div>

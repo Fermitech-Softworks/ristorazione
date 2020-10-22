@@ -1,9 +1,28 @@
 {% extends "stampo.htm" %}
 {% block title %}{{ gettext("Tables") }}{% endblock %}
 {% block extrahead %}
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"
+            integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
     <script>
         $(document).ready(function () {
             $('.modal').modal();
+        });
+
+        var socket = io();
+        $(document).ready(function () {
+            socket.on('connect', function () {
+                socket.emit('connectPersonnel', rid ={{ rid }})
+            });
+        });
+
+        socket.on('newOrder', function (json){
+            json = Json.parse(json)
+            M.toast({html: 'New order from table '+json['order']['tid']})
+        });
+
+        socket.on('updateOrderStatus', function (json){
+            json = Json.parse(json)
+            M.toast({html: 'New update from table '+json['order']['tid']})
         });
 
         function getToken(tid, rid) {
@@ -66,7 +85,7 @@
                         console.log(response)
                         var mwindow = window.open("", "Recap", "width=800,height=600")
                         for (const o of response['orders']) {
-                            mwindow.document.write("<p>"+o['name']+" x"+o['qty']+" , "+o['cost']+"€"+"</p>")
+                            mwindow.document.write("<p>" + o['name'] + " x" + o['qty'] + " , " + o['cost'] + "€" + "</p>")
                         }
                         mwindow.print()
                         prepareModal(tid, rid)

@@ -49,12 +49,14 @@ class Restaurant(db.Model):
     city = db.Column(db.String)
     address = db.Column(db.String)
     state = db.Column(db.String)
+    description = db.Column(db.String)
     work = db.relationship("Work", back_populates="restaurant")
     menus = db.relationship("MenuAssociation", back_populates="restaurant")
     ownedPlates = db.relationship("Plate", back_populates="restaurant")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant")
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant")
+    orders = db.relationship("Order", back_populates="restaurant")
 
 
 class Work(db.Model):
@@ -123,7 +125,7 @@ class Category(db.Model):
     plates = db.relationship("CategoryAssociation", back_populates="category")
 
     def toJson(self):
-        return {'cid':self.cid, 'name':self.name}
+        return {'cid': self.cid, 'name': self.name}
 
 
 class Plate(db.Model):
@@ -139,7 +141,8 @@ class Plate(db.Model):
     restaurant = db.relationship("Restaurant", back_populates="ownedPlates")
 
     def toJson(self):
-        return {'pid':self.pid, 'name':self.name, 'description': self.description, 'ingredients':self.ingredients, 'cost':self.cost}
+        return {'pid': self.pid, 'name': self.name, 'description': self.description, 'ingredients': self.ingredients,
+                'cost': self.cost}
 
 
 class CategoryAssociation(db.Model):
@@ -152,11 +155,14 @@ class CategoryAssociation(db.Model):
 
 class Order(db.Model):
     __tablename__ = "order"
+    restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
     tableId = db.Column(db.Integer, db.ForeignKey('table.tid'), primary_key=True)
     plateId = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
     quantity = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.Integer, nullable=False, default=0)
     table = db.relationship("Table", back_populates="order")
     plate = db.relationship("Plate", back_populates="order")
+    restaurant = db.relationship("Restaurant", back_populates="orders")
 
 
 # UTILITIES
@@ -166,6 +172,12 @@ class UserType(IntEnum):
     waiter = 1
     owner = 2
     admin = 3
+
+
+class OrderType(IntEnum):
+    submitted = 0
+    accepted = 1
+    delivered = 2
 
 
 def login(email, password):
@@ -337,7 +349,10 @@ def page_restaurant_add():
     db.session.commit()
     user.restaurantId = newRestaurant.rid
     for i in range(0, numberOfTables, 1):
-        db.session.add(Table(tid=i, restaurantId=newRestaurant.rid))
+        t = Table(tid=i, restaurantId=newRestaurant.rid)
+        token = createToken(t)
+        t.token = token
+        db.session.add(t)
     newWork = Work(userEmail=user.email, restaurantId=newRestaurant.rid, type=UserType.owner)
     db.session.add(newWork)
     db.session.commit()
@@ -448,7 +463,7 @@ def page_menu_add(rid):
         newAssociation = MenuAssociation(restaurantId=rid, menuId=newMenu.mid)
         db.session.add(newAssociation)
         db.session.commit()
-        return redirect(url_for("page_menu_details", mid=newMenu.mid))
+        return redirect(url_for("page_menu_details", mid=newMenu.mid, rid=rid))
 
 
 @app.route("/restaurant/<int:rid>/menu/<int:mid>")
@@ -512,7 +527,8 @@ def page_dish_add(rid):
     newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost, restaurant_id=rid)
     db.session.add(newDish)
     db.session.commit()
-    return redirect(url_for("page_restaurant_management"), rid=rid)
+    print(rid)
+    return redirect(url_for("page_restaurant_management", rid=rid))
 
 
 @app.route("/restaurant/<int:rid>/dish/get", methods=['POST'])
@@ -522,8 +538,9 @@ def page_dish_get(rid):
     dishlist = []
     for dish in dishes:
         dishlist.append(dish.toJson())
-    response={'response':dishlist}
+    response = {'response': dishlist}
     return response
+
 
 @app.route("/restaurant/<int:rid>/menu/<int:mid>/dish/add/<int:cid>", methods=["POST"])
 @login_or_403
@@ -551,7 +568,7 @@ def page_menu_get_components(mid, cid):
         catlist.append(cat.toJson())
     for dish in dishes:
         dishlist.append(dish.plate.toJson())
-    response = {'response':{'categories':catlist, 'dishes':dishlist}}
+    response = {'response': {'categories': catlist, 'dishes': dishlist}}
     return response
 
 
@@ -578,7 +595,7 @@ def page_restaurant_tables(rid):
     if not check or check.type < UserType.waiter:
         abort(403)
     tables = Table.query.filter_by(restaurantId=rid).all()
-    return render_template("Restaurant/tables.htm", user=user, tables=tables)
+    return render_template("Restaurant/tables.htm", user=user, tables=tables, rid=rid)
 
 
 @app.route("/table/<int:tid>/getToken", methods=['POST'])
@@ -590,7 +607,7 @@ def page_table_get_token(tid):
     if not check or check.type < UserType.waiter:
         abort(403)
     table = Table.query.get_or_404((tid, rid))
-    return {'token':table.token}
+    return {'token': table.token}
 
 
 @app.route("/table/<int:tid>/getOrders", methods=['POST'])
@@ -602,9 +619,9 @@ def page_table_get_orders(tid):
     if not check or check.type < UserType.waiter:
         abort(403)
     table = Table.query.get_or_404((tid, rid))
-    response = {'orders':[]}
+    response = {'orders': []}
     for order in table.order:
-        tmp = {'pid':order.plate.pid, 'name':order.plate.name, 'cost':order.plate.cost, 'qty':order.quantity}
+        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': order.plate.cost, 'qty': order.quantity}
         response['orders'].append(tmp)
     return response
 
@@ -618,14 +635,54 @@ def page_table_close(tid):
     if not check or check.type < UserType.waiter:
         abort(403)
     table = Table.query.get_or_404((tid, rid))
-    response = {'orders':[]}
+    response = {'orders': []}
     for order in table.order:
-        tmp = {'pid':order.plate.pid, 'name':order.plate.name, 'cost':order.plate.cost*order.quantity, 'qty':order.quantity}
+        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': order.plate.cost * order.quantity,
+               'qty': order.quantity}
         response['orders'].append(tmp)
         db.session.delete(order)
     table.token = createToken(table)
     db.session.commit()
     return response
+
+
+@app.route("/restaurant/<int:rid>/tableLogin", methods=['POST'])
+def page_table_login(rid):
+    table = Table.query.filter_by(tid=request.form.get('tableId'), restaurantId=rid,
+                                  token=request.form.get('token')).first()
+    if not table:
+        abort(403)
+    session['tid'] = request.form.get('tableId')
+    session['token'] = request.form.get('token')
+    session['rid'] = rid
+    return redirect(url_for('page_orders_dashboard', rid=rid))
+
+
+@app.route("/restaurant/<int:rid>/orderManager")
+def page_orders_dashboard(rid):
+    if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
+                                                         token=session['token']):
+        abort(403)
+    menus = Menu.query.join(MenuAssociation).filter(MenuAssociation.restaurantId == rid, Menu.enabled == True).all()
+    orders = Order.query.filter_by(restaurantId=rid, tableId=session['table']).all()
+    return render_template("Orders/dashboard.htm", menus=menus, orders=orders, tid=session['tid'], rid=rid)
+
+
+@app.route("/restaurant/<int:rid>/orders/table/<int:tid>/menu/<int:mid>", methods=['GET', 'POST'])
+def page_orders_menu(rid, tid, mid):
+    menu = Menu.query.get_or_404(mid)
+    if not menu.enabled:
+        abort(403)
+    return render_template("Orders/menu.htm", menu=menu, rid=rid, tid=tid)
+
+
+@app.route('/restaurant/<int:rid>/order/<int:tid>', methods=['GET', 'POST'])
+def page_order_submit(rid, tid):
+    if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
+                                                         token=session['token']):
+        abort(403)
+    print(request.json)
+    return "200"
 
 
 @app.route("/about")
@@ -639,9 +696,11 @@ def page_about():
 @login_or_403
 def connHandler(rid):
     user = find_user(session['email'])
+    print("User {} is trying to access...".format(user.email))
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
     if not check or check.type < UserType.waiter:
         return
+    print("User {} has joined room {}.".format(user.email, rid))
     join_room(rid)
 
 
@@ -650,14 +709,32 @@ def connHandler(rid):
 def disconnHandler(rid):
     user = find_user(session['email'])
     leave_room(rid)
+    print("User {} has disconnected from room {}.".format(user.email, rid))
 
 
 @socketio.on('newOrder')
-def orderHandler(json): #{'rid':rid, 'order':['tid':tid, 'token':token, 'plates':[]]}
-    check = Table.query.filter_by(restaurantId=json['rid'], tid=json['order']['tid'], token=json['order']['token']).first()
+def orderHandler(json):  # {'rid':rid, 'order':{'tid':tid, 'token':token, 'plates':[]}}
+    check = Table.query.filter_by(restaurantId=json['rid'], tid=json['order']['tid'],
+                                  token=json['order']['token']).first()
     if not check:
         return
-    emit(json['order']['plates'], room=json['rid'])
+    for plate in json['order']['plates']:
+        newOrder = Order(plateId=plate['pid'], tableId=json['order']['tid'], quantity=plate['qty'])
+        db.session.add(newOrder)
+        db.session.commit()
+    emit(json, room=json['rid'])
+
+
+@socketio.on('updateOrderStatus')
+def updaterHandler(json):  # {'rid':rid, 'order':{'tid':tid, 'token':token, 'pid':pid}, 'status':status}
+    check = Table.query.filter_by(restaurantId=json['rid'], tid=json['order']['tid'],
+                                  token=json['order']['token']).first()
+    if not check or status < 0 or status > 4:
+        return
+    order = Order.query.Join(Table).filter(Table.restaurantId == json['rid'], Order.plateId == json['order']['pid'],
+                                           Order.tableId == json['order']['tid']).first()
+    order.status = json['status']
+    emit(json, room=json['rid'])
 
 
 if __name__ == "__main__":
@@ -674,4 +751,3 @@ if __name__ == "__main__":
         db.session.commit()
     print("The db is delicious!")
     socketio.run(app, debug=True, host='0.0.0.0')
-
