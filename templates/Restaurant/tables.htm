@@ -155,7 +155,7 @@
                     <li class="collection-item">
                         <div>{{ gettext("Table") }} {{ table.tid + 1 }}
                             <a href="" data-target="modal{{ table.tid }}" class="secondary-content modal-trigger"
-                               onclick="prepareModal({{ table.tid }}, {{ table.restaurantId }})"><i
+                               onclick="prepareModal({{ table.tid + 1 }}, {{ table.restaurantId }})"><i
                                     class="material-icons">search</i>
                             </a>
                         </div>

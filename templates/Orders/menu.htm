@@ -4,10 +4,9 @@
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"
             integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
     <script>
-        var socket;
+        var socket = io();
         $(document).ready(function () {
             $('.modal').modal();
-            socket = io.connect('http://127.0.0.1:5000')
         });
         $(document).ready(function () {
             $('select').formSelect();
@@ -203,13 +202,14 @@
             button = document.getElementById("subButton");
             button.setAttribute("onclick", "return false;")
             socket.emit('newOrder', {json: orders})
+            sleep(1000);
             window.location='{{url_for('page_orders_dashboard', rid=rid)}}';
         }
 
     </script>
 {% endblock %}
 {% block content %}
-    <h5>{{ gettext("You are inspecting ") }}"{{ menu.name }}"</h5>
+    <h5>{{ gettext("You are inspecting 1 ") }}"{{ menu.name }}"</h5>
     <a href="/restaurant/{{ rid }}/orderManager" class="btn waves-effect waves-light" type="submit"
        name="action">{{ gettext("Return to your dashboard") }} <i class="material-icons right">exit_to_app</i></a>
     <a href="#" class="btn waves-effect waves-light" type="submit" onclick="submitOrder()"

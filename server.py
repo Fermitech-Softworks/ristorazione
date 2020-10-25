@@ -656,7 +656,7 @@ def page_table_close(tid):
 
 @app.route("/restaurant/<int:rid>/tableLogin", methods=['POST'])
 def page_table_login(rid):
-    table = Table.query.filter_by(tid=int(request.form.get('tableId')), restaurantId=rid,
+    table = Table.query.filter_by(tid=int(request.form.get('tableId'))-1, restaurantId=rid,
                                   token=request.form.get('token')).first()
     if not table:
         abort(403)
@@ -740,6 +740,7 @@ def disconnHandler(rid):
 
 @socketio.on('newOrder')
 def orderHandler(json):
+    print("start")
     if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
                                                          token=session['token']):
         abort(403)
@@ -754,6 +755,7 @@ def orderHandler(json):
 
     db.session.commit()
     emit('newOrder', json, room=session['rid'], json=True)
+    print("finish")
 
 
 @socketio.on('updateOrderStatus')
