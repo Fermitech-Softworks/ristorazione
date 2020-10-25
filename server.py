@@ -155,9 +155,10 @@ class CategoryAssociation(db.Model):
 
 class Order(db.Model):
     __tablename__ = "order"
-    restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
-    tableId = db.Column(db.Integer, db.ForeignKey('table.tid'), primary_key=True)
-    plateId = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    oid = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), nullable=False)
+    tableId = db.Column(db.Integer, db.ForeignKey('table.tid'), nullable=False)
+    plateId = db.Column(db.Integer, db.ForeignKey('plate.pid'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     status = db.Column(db.Integer, nullable=False, default=0)
     table = db.relationship("Table", back_populates="order")
@@ -344,7 +345,11 @@ def page_restaurant_add():
     name = request.form.get("name")
     tax = float(request.form.get("tax"))
     numberOfTables = int(request.form.get("numberOfTables"))
-    newRestaurant = Restaurant(name=name, tax=tax)
+    address = request.form.get("address")
+    city = request.form.get("city")
+    state = request.form.get("state")
+    desc = request.form.get("desc")
+    newRestaurant = Restaurant(name=name, tax=tax, city=city, address=address, state=state, description=desc)
     db.session.add(newRestaurant)
     db.session.commit()
     user.restaurantId = newRestaurant.rid
@@ -595,7 +600,10 @@ def page_restaurant_tables(rid):
     if not check or check.type < UserType.waiter:
         abort(403)
     tables = Table.query.filter_by(restaurantId=rid).all()
-    return render_template("Restaurant/tables.htm", user=user, tables=tables, rid=rid)
+    orders_pending = Order.query.filter_by(restaurantId=rid, status=OrderType.submitted).all()
+    orders_tbd = Order.query.filter_by(restaurantId=rid, status=OrderType.accepted).all()
+    orders_complete = Order.query.filter_by(restaurantId=rid, status=OrderType.delivered).all()
+    return render_template("Restaurant/tables.htm", user=user, tables=tables, rid=rid, op=orders_pending, ot=orders_tbd, oc=orders_complete)
 
 
 @app.route("/table/<int:tid>/getToken", methods=['POST'])
@@ -648,7 +656,7 @@ def page_table_close(tid):
 
 @app.route("/restaurant/<int:rid>/tableLogin", methods=['POST'])
 def page_table_login(rid):
-    table = Table.query.filter_by(tid=request.form.get('tableId'), restaurantId=rid,
+    table = Table.query.filter_by(tid=int(request.form.get('tableId')), restaurantId=rid,
                                   token=request.form.get('token')).first()
     if not table:
         abort(403)
@@ -664,7 +672,7 @@ def page_orders_dashboard(rid):
                                                          token=session['token']):
         abort(403)
     menus = Menu.query.join(MenuAssociation).filter(MenuAssociation.restaurantId == rid, Menu.enabled == True).all()
-    orders = Order.query.filter_by(restaurantId=rid, tableId=session['table']).all()
+    orders = Order.query.filter_by(restaurantId=rid, tableId=session['tid']).all()
     return render_template("Orders/dashboard.htm", menus=menus, orders=orders, tid=session['tid'], rid=rid)
 
 
@@ -681,8 +689,17 @@ def page_order_submit(rid, tid):
     if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
                                                          token=session['token']):
         abort(403)
-    print(request.json)
-    return "200"
+    data = request.json
+    for elem in data.keys():
+        if not elem == '-1':
+            newOrder = Order(restaurantId=rid, tableId=tid, plateId=elem, quantity=data[elem]['qty'])
+            db.session.add(newOrder)
+            db.session.commit()
+            json = {'rid': rid, 'order': {'tid': tid, 'token': session['token'], 'pid': elem, 'qty': data[elem]['qty'],
+                                          'oid': newOrder.oid, 'status': newOrder.status}}
+            orderHandler(json)
+    db.session.commit()
+    return "200 OK"
 
 
 @app.route("/about")
@@ -704,6 +721,15 @@ def connHandler(rid):
     join_room(rid)
 
 
+@socketio.on('ping')
+def pingHandler(rid):
+    print("Table {} is pinging".format(rid))
+    if 'tid' not in session:
+        return
+    print("Table {} is pinging".format(rid))
+    emit("ping", room=rid)
+
+
 @socketio.on('disconnectPersonnel')
 @login_or_403
 def disconnHandler(rid):
@@ -713,28 +739,33 @@ def disconnHandler(rid):
 
 
 @socketio.on('newOrder')
-def orderHandler(json):  # {'rid':rid, 'order':{'tid':tid, 'token':token, 'plates':[]}}
-    check = Table.query.filter_by(restaurantId=json['rid'], tid=json['order']['tid'],
-                                  token=json['order']['token']).first()
-    if not check:
-        return
-    for plate in json['order']['plates']:
-        newOrder = Order(plateId=plate['pid'], tableId=json['order']['tid'], quantity=plate['qty'])
-        db.session.add(newOrder)
-        db.session.commit()
-    emit(json, room=json['rid'])
+def orderHandler(json):
+    if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
+                                                         token=session['token']):
+        abort(403)
+    data = json['json']
+    for elem in data.keys():
+        if not elem == '-1':
+            newOrder = Order(restaurantId=session['rid'], tableId=session['tid'], plateId=elem,
+                             quantity=data[elem]['qty'])
+            db.session.add(newOrder)
+            db.session.commit()
+            data[elem]['oid'] = newOrder.oid
+
+    db.session.commit()
+    emit('newOrder', json, room=session['rid'], json=True)
 
 
 @socketio.on('updateOrderStatus')
-def updaterHandler(json):  # {'rid':rid, 'order':{'tid':tid, 'token':token, 'pid':pid}, 'status':status}
-    check = Table.query.filter_by(restaurantId=json['rid'], tid=json['order']['tid'],
-                                  token=json['order']['token']).first()
-    if not check or status < 0 or status > 4:
+@login_or_403
+def updaterHandler(json):  # {'oid': oid, 'status': statusDict[newLevel], 'oldStatus': statusDict[oldLevel]}
+    if json['status'] < 0 or json['status'] > 2:
         return
-    order = Order.query.Join(Table).filter(Table.restaurantId == json['rid'], Order.plateId == json['order']['pid'],
-                                           Order.tableId == json['order']['tid']).first()
+    order = Order.query.filter_by(oid=json['oid']).first()
     order.status = json['status']
-    emit(json, room=json['rid'])
+    json['name'] = order.plate.name
+    db.session.commit()
+    emit('updateOrderStatus', json, room=json['rid'], json=True)
 
 
 if __name__ == "__main__":

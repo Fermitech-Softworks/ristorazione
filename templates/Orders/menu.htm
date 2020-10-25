@@ -1,9 +1,13 @@
 {% extends "stampo.htm" %}
 {% block title %}{{ gettext("Menu ") }} {{ menu.mid }}{% endblock %}
 {% block extrahead %}
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"
+            integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
     <script>
+        var socket;
         $(document).ready(function () {
             $('.modal').modal();
+            socket = io.connect('http://127.0.0.1:5000')
         });
         $(document).ready(function () {
             $('select').formSelect();
@@ -192,22 +196,14 @@
             });
         }
 
+
+
         function submitOrder() {
+            console.log('ping1')
             button = document.getElementById("subButton");
             button.setAttribute("onclick", "return false;")
-            var xhr = new XMLHttpRequest();
-            xhr.addEventListener("readystatechange", function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                    }
-                    else{
-                        button.setAttribute("onclick", "submitOrder()")
-                    }
-                }
-            });
-            xhr.open("POST", '/restaurant/'+{{ rid }}+'/order/' +{{ tid }});
-            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
-            xhr.send(JSON.stringify(orders));
+            socket.emit('newOrder', {json: orders})
+            window.location='{{url_for('page_orders_dashboard', rid=rid)}}';
         }
 
     </script>

@@ -1,5 +1,17 @@
 {% extends "stampo.htm" %}
 {% block title %}{{ gettext("Table ") }} {{ tid }}{% endblock %}
+{% block extrahead %}
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"
+            integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+    <script>
+        var socket = io();
+        $(document).ready(function () {
+            socket.on('ping', function () {
+                socket.emit('ping', {data: 1});
+            });
+        });
+    </script>
+{% endblock %}
 {% block content %}
     <div class="row">
         <div class="col s12 m6">

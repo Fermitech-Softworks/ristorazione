@@ -1,29 +1,68 @@
 {% extends "stampo.htm" %}
 {% block title %}{{ gettext("Tables") }}{% endblock %}
 {% block extrahead %}
+
     <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"
             integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
     <script>
+        let socket = io();
         $(document).ready(function () {
             $('.modal').modal();
-        });
-
-        var socket = io();
-        $(document).ready(function () {
+            $('.collapsible').collapsible();
             socket.on('connect', function () {
                 socket.emit('connectPersonnel', rid ={{ rid }})
             });
+            socket.on('ping', function () {
+                console.log("ping")
+            });
+            socket.on('newOrder', function (json) {
+                json = JSON.parse(json)
+
+            });
+            socket.on('updateOrderStatus', function (json) {
+                console.log("Ciao")
+                let statusDict = {0:'new', 1:'tbd', 2:'delivered'}
+                let newTab = document.getElementById(statusDict[json['status']]);
+                let oldTab = document.getElementById(statusDict[json['oldStatus']]);
+                let oldRow = document.getElementById("order-" + json['oid']);
+                let actionSpace = document.getElementById("action-"+json['oid']);
+                let nextButton = document.createElement("a");
+                let nextIcon = document.createElement("i");
+                let backButton = document.createElement("a");
+                let backIcon = document.createElement("i");
+                nextButton.appendChild(nextIcon);
+                backButton.appendChild(backIcon);
+                actionSpace.innerHTML = "";
+                if(json['status']===0){
+                    nextButton.href="#!"
+                    nextButton.setAttribute('onclick', 'change('+json['oid']+', \'tbd\', \'new\')')
+                    nextIcon.className = "material-icons";
+                    nextIcon.textContent = "arrow_drop_down";
+                    actionSpace.appendChild(nextButton);
+                }
+                if(json['status']===1){
+                    nextButton.href="#!"
+                    nextButton.setAttribute('onclick', 'change('+json['oid']+', \'new\', \'tbd\')')
+                    nextIcon.className = "material-icons";
+                    nextIcon.textContent = "arrow_drop_up";
+                    actionSpace.appendChild(nextButton);
+                    backButton.href="#!"
+                    backButton.setAttribute('onclick', 'change('+json['oid']+', \'delivered\', \'tbd\')')
+                    backIcon.className = "material-icons";
+                    backIcon.textContent = "arrow_drop_down";
+                    actionSpace.appendChild(backButton);
+                }
+                if(json['status']===2){
+                    backButton.href="#!"
+                    backButton.setAttribute('onclick', 'change('+json['oid']+', \'tbd\', \'delivered\')')
+                    backIcon.className = "material-icons";
+                    backIcon.textContent = "arrow_drop_down";
+                    actionSpace.appendChild(backButton);
+                }
+                newTab.appendChild(oldRow);
+            });
         });
 
-        socket.on('newOrder', function (json){
-            json = Json.parse(json)
-            M.toast({html: 'New order from table '+json['order']['tid']})
-        });
-
-        socket.on('updateOrderStatus', function (json){
-            json = Json.parse(json)
-            M.toast({html: 'New update from table '+json['order']['tid']})
-        });
 
         function getToken(tid, rid) {
             let xhr = new XMLHttpRequest();
@@ -40,7 +79,7 @@
             });
             xhr.open("POST", "/table/" + tid + "/getToken", true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            var parametri = "rid=" + rid
+            let parametri = "rid=" + rid
             xhr.send(parametri);
         }
 
@@ -51,12 +90,12 @@
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        var response = JSON.parse(xhr.responseText);
+                        let response = JSON.parse(xhr.responseText);
                         for (const o of response['orders']) {
-                            var newLi = document.createElement("li")
+                            let newLi = document.createElement("li")
                             newLi.className = "collection-item";
                             refUl.appendChild(newLi)
-                            var internalDiv = document.createElement("div");
+                            let internalDiv = document.createElement("div");
                             internalDiv.innerText = o['name'] + " x" + o['qty'] + ", for each " + o['cost'] + "€.";
                             newLi.appendChild(internalDiv);
                         }
@@ -65,7 +104,7 @@
             });
             xhr.open("POST", "/table/" + tid + "/getOrders", true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            var parametri = "rid=" + rid
+            let parametri = "rid=" + rid
             xhr.send(parametri);
         }
 
@@ -81,9 +120,9 @@
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-                        var response = JSON.parse(xhr.responseText);
+                        let response = JSON.parse(xhr.responseText);
                         console.log(response)
-                        var mwindow = window.open("", "Recap", "width=800,height=600")
+                        let mwindow = window.open("", "Recap", "width=800,height=600")
                         for (const o of response['orders']) {
                             mwindow.document.write("<p>" + o['name'] + " x" + o['qty'] + " , " + o['cost'] + "€" + "</p>")
                         }
@@ -94,8 +133,14 @@
             });
             xhr.open("POST", "/table/" + tid + "/close", true);
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            var parametri = "rid=" + rid
+            let parametri = "rid=" + rid
             xhr.send(parametri);
+        }
+
+        function change(oid, newLevel, oldLevel) {
+            let statusDict = {'new': 0, 'tbd': 1, 'delivered': 2}
+            let json = {'oid': oid, 'status': statusDict[newLevel], 'oldStatus': statusDict[oldLevel], 'rid': {{rid}}}
+            socket.emit('updateOrderStatus', json)
         }
 
     </script>
@@ -119,9 +164,8 @@
                                 <h4>{{ gettext("Table number") }} {{ table.tid + 1 }}</h4>
                                 <div class="row">
                                     <div class="col s12 m6">
-                                        <p>{{ gettext("The current token is ") }}
+                                        <p>{{ gettext("The current token is ") }}</p>
                                         <div id="token{{ table.tid }}"></div>
-                                        </p>
                                         <a href="#" onclick="closeTable({{ table.tid }}, {{ table.restaurantId }})"
                                            class="waves-effect waves-light btn">Sign-off table</a>
                                     </div>
@@ -143,5 +187,93 @@
                 {% endfor %}
             </ul>
         </div>
+        <div class="col s12 m6">
+            <ul class="collapsible">
+                <li>
+                    <div class="collapsible-header">{{ gettext("New Orders") }}</div>
+                    <div class="collapsible-body">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>{{ gettext('Table') }}</th>
+                                <th>{{ gettext('Plate') }}</th>
+                                <th>{{ gettext('Qty') }}</th>
+                                <th>{{ gettext('Actions') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody id="new">
+                            {% for order in op %}
+                                <tr id="order-{{ order.oid }}">
+                                    <td>{{ order.tableId }}</td>
+                                    <td>{{ order.plate.name }}</td>
+                                    <td>{{ order.quantity }}</td>
+                                    <td id="action-{{ order.oid }}"><a href="#!" onclick="change({{ order.oid }}, 'tbd', 'new')"><i
+                                            class="material-icons">arrow_drop_down</i></a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </li>
+                <li>
+                    <div class="collapsible-header">{{ gettext("Waiting for delivery") }}</div>
+                    <div class="collapsible-body">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>{{ gettext('Table') }}</th>
+                                <th>{{ gettext('Plate') }}</th>
+                                <th>{{ gettext('Qty') }}</th>
+                                <th>{{ gettext('Actions') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody id="tbd">
+                            {% for order in ot %}
+                                <tr id="order-{{ order.oid }}">
+                                    <td>{{ order.tableId }}</td>
+                                    <td>{{ order.plate.name }}</td>
+                                    <td>{{ order.quantity }}</td>
+                                    <td id="action-{{ order.oid }}"><a href="#!" onclick="change({{ order.oid }}, 2, 'delivered', 'tbd')"><i
+                                            class="material-icons">arrow_drop_down</i></a>
+                                        <a href="#!" onclick="change({{ order.oid }}, 0, 'new', 'tbd')"><i
+                                                class="material-icons">arrow_drop_up</i></a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </li>
+                <li>
+                    <div class="collapsible-header">{{ gettext("Delivered") }}</div>
+                    <div class="collapsible-body">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>{{ gettext('Table') }}</th>
+                                <th>{{ gettext('Plate') }}</th>
+                                <th>{{ gettext('Qty') }}</th>
+                                <th>{{ gettext('Actions') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody id="delivered">
+                            {% for order in oc %}
+                                <tr id="order-{{ order.oid }}">
+                                    <td>{{ order.tableId }}</td>
+                                    <td>{{ order.plate.name }}</td>
+                                    <td>{{ order.quantity }}</td>
+                                    <td id="action-{{ order.oid }}"><a href="#!" onclick="change({{ order.oid }}, 1, 'tbd', 'delivered')"><i
+                                            class="material-icons">arrow_drop_up</i></a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </li>
+            </ul>
+        </div>
     </div>
+
 {% endblock %}
