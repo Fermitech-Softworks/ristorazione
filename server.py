@@ -603,7 +603,8 @@ def page_restaurant_tables(rid):
     orders_pending = Order.query.filter_by(restaurantId=rid, status=OrderType.submitted).all()
     orders_tbd = Order.query.filter_by(restaurantId=rid, status=OrderType.accepted).all()
     orders_complete = Order.query.filter_by(restaurantId=rid, status=OrderType.delivered).all()
-    return render_template("Restaurant/tables.htm", user=user, tables=tables, rid=rid, op=orders_pending, ot=orders_tbd, oc=orders_complete)
+    return render_template("Restaurant/tables.htm", user=user, tables=tables, rid=rid, op=orders_pending, ot=orders_tbd,
+                           oc=orders_complete)
 
 
 @app.route("/table/<int:tid>/getToken", methods=['POST'])
@@ -654,13 +655,18 @@ def page_table_close(tid):
     return response
 
 
-@app.route("/restaurant/<int:rid>/tableLogin", methods=['POST'])
+@app.route("/restaurant/<int:rid>/tableLogin", methods=['POST', 'GET'])
 def page_table_login(rid):
-    table = Table.query.filter_by(tid=int(request.form.get('tableId'))-1, restaurantId=rid,
+    if 'tid' in session and request.method == "GET":
+        del session['tid']
+        del session['token']
+        del session['rid']
+        return redirect(url_for('page_restaurant_info', rid=rid))
+    table = Table.query.filter_by(tid=int(request.form.get('tableId')) - 1, restaurantId=rid,
                                   token=request.form.get('token')).first()
     if not table:
         abort(403)
-    session['tid'] = request.form.get('tableId')
+    session['tid'] = int(request.form.get('tableId')) - 1
     session['token'] = request.form.get('token')
     session['rid'] = rid
     return redirect(url_for('page_orders_dashboard', rid=rid))
@@ -669,8 +675,8 @@ def page_table_login(rid):
 @app.route("/restaurant/<int:rid>/orderManager")
 def page_orders_dashboard(rid):
     if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
-                                                         token=session['token']):
-        abort(403)
+                                                         token=session['token']).first():
+        return redirect(url_for('page_restaurant_info', rid=rid))
     menus = Menu.query.join(MenuAssociation).filter(MenuAssociation.restaurantId == rid, Menu.enabled == True).all()
     orders = Order.query.filter_by(restaurantId=rid, tableId=session['tid']).all()
     return render_template("Orders/dashboard.htm", menus=menus, orders=orders, tid=session['tid'], rid=rid)
@@ -678,6 +684,9 @@ def page_orders_dashboard(rid):
 
 @app.route("/restaurant/<int:rid>/orders/table/<int:tid>/menu/<int:mid>", methods=['GET', 'POST'])
 def page_orders_menu(rid, tid, mid):
+    if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
+                                                         token=session['token']).first():
+        return redirect(url_for('page_restaurant_info', rid=rid))
     menu = Menu.query.get_or_404(mid)
     if not menu.enabled:
         abort(403)
@@ -687,7 +696,7 @@ def page_orders_menu(rid, tid, mid):
 @app.route('/restaurant/<int:rid>/order/<int:tid>', methods=['GET', 'POST'])
 def page_order_submit(rid, tid):
     if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
-                                                         token=session['token']):
+                                                         token=session['token']).first():
         abort(403)
     data = request.json
     for elem in data.keys():
@@ -742,9 +751,10 @@ def disconnHandler(rid):
 def orderHandler(json):
     print("start")
     if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
-                                                         token=session['token']):
+                                                         token=session['token']).first():
         abort(403)
     data = json['json']
+    data.pop('-1')
     for elem in data.keys():
         if not elem == '-1':
             newOrder = Order(restaurantId=session['rid'], tableId=session['tid'], plateId=elem,
@@ -752,9 +762,9 @@ def orderHandler(json):
             db.session.add(newOrder)
             db.session.commit()
             data[elem]['oid'] = newOrder.oid
-
+            data[elem]['tid'] = session['tid']
     db.session.commit()
-    emit('newOrder', json, room=session['rid'], json=True)
+    emit('newOrder', data, room=session['rid'], json=True)
     print("finish")
 
 
