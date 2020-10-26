@@ -11,21 +11,48 @@
             $('.collapsible').collapsible();
             socket.on('connect', function () {
                 socket.emit('connectPersonnel', rid ={{ rid }})
+                M.toast({html: '{{ gettext("Connection with the server has been established.") }}'})
             });
             socket.on('ping', function () {
                 console.log("ping")
             });
             socket.on('newOrder', function (json) {
-                json = JSON.parse(json)
-
+                M.toast({html: '{{ gettext("A new order has been compiled.") }}'})
+                let newTab = document.getElementById("new");
+                console.log(json);
+                for (const value of Object.keys(json)) {
+                    let nextButton = document.createElement("a");
+                    let nextIcon = document.createElement("i");
+                    let row = document.createElement("tr");
+                    row.id = "order-" + json[value]['oid'];
+                    newTab.appendChild(row);
+                    let tableId = document.createElement("td");
+                    tableId.innerText = json[value]['tid']+1;
+                    row.appendChild(tableId);
+                    let plateName = document.createElement("td")
+                    plateName.innerText = json[value]['name'];
+                    row.appendChild(plateName);
+                    let qty = document.createElement("td")
+                    qty.innerText = json[value]['qty'];
+                    row.appendChild(qty);
+                    let action = document.createElement("td");
+                    action.id = "action-" + json[value]['oid'];
+                    row.appendChild(action);
+                    nextButton.href = "#!"
+                    nextButton.setAttribute('onclick', 'change(' + json[value]['oid'] + ', \'tbd\', \'new\')')
+                    nextIcon.className = "material-icons";
+                    nextIcon.textContent = "arrow_drop_down";
+                    nextButton.appendChild(nextIcon);
+                    action.appendChild(nextButton);
+                }
             });
             socket.on('updateOrderStatus', function (json) {
                 console.log("Ciao")
-                let statusDict = {0:'new', 1:'tbd', 2:'delivered'}
+                let statusDict = {0: 'new', 1: 'tbd', 2: 'delivered'}
                 let newTab = document.getElementById(statusDict[json['status']]);
                 let oldTab = document.getElementById(statusDict[json['oldStatus']]);
                 let oldRow = document.getElementById("order-" + json['oid']);
-                let actionSpace = document.getElementById("action-"+json['oid']);
+                let actionSpace = document.getElementById("action-" + json['oid']);
                 let nextButton = document.createElement("a");
                 let nextIcon = document.createElement("i");
                 let backButton = document.createElement("a");
@@ -33,30 +60,30 @@
                 nextButton.appendChild(nextIcon);
                 backButton.appendChild(backIcon);
                 actionSpace.innerHTML = "";
-                if(json['status']===0){
-                    nextButton.href="#!"
-                    nextButton.setAttribute('onclick', 'change('+json['oid']+', \'tbd\', \'new\')')
+                if (json['status'] === 0) {
+                    nextButton.href = "#!"
+                    nextButton.setAttribute('onclick', 'change(' + json['oid'] + ', \'tbd\', \'new\')')
                     nextIcon.className = "material-icons";
                     nextIcon.textContent = "arrow_drop_down";
                     actionSpace.appendChild(nextButton);
                 }
-                if(json['status']===1){
-                    nextButton.href="#!"
-                    nextButton.setAttribute('onclick', 'change('+json['oid']+', \'new\', \'tbd\')')
+                if (json['status'] === 1) {
+                    nextButton.href = "#!"
+                    nextButton.setAttribute('onclick', 'change(' + json['oid'] + ', \'new\', \'tbd\')')
                     nextIcon.className = "material-icons";
                     nextIcon.textContent = "arrow_drop_up";
                     actionSpace.appendChild(nextButton);
-                    backButton.href="#!"
-                    backButton.setAttribute('onclick', 'change('+json['oid']+', \'delivered\', \'tbd\')')
+                    backButton.href = "#!"
+                    backButton.setAttribute('onclick', 'change(' + json['oid'] + ', \'delivered\', \'tbd\')')
                     backIcon.className = "material-icons";
                     backIcon.textContent = "arrow_drop_down";
                     actionSpace.appendChild(backButton);
                 }
-                if(json['status']===2){
-                    backButton.href="#!"
-                    backButton.setAttribute('onclick', 'change('+json['oid']+', \'tbd\', \'delivered\')')
+                if (json['status'] === 2) {
+                    backButton.href = "#!"
+                    backButton.setAttribute('onclick', 'change(' + json['oid'] + ', \'tbd\', \'delivered\')')
                     backIcon.className = "material-icons";
-                    backIcon.textContent = "arrow_drop_down";
+                    backIcon.textContent = "arrow_drop_up";
                     actionSpace.appendChild(backButton);
                 }
                 newTab.appendChild(oldRow);
@@ -155,7 +182,7 @@
                     <li class="collection-item">
                         <div>{{ gettext("Table") }} {{ table.tid + 1 }}
                             <a href="" data-target="modal{{ table.tid }}" class="secondary-content modal-trigger"
-                               onclick="prepareModal({{ table.tid + 1 }}, {{ table.restaurantId }})"><i
+                               onclick="prepareModal({{ table.tid }}, {{ table.restaurantId }})"><i
                                     class="material-icons">search</i>
                             </a>
                         </div>
@@ -204,10 +231,11 @@
                             <tbody id="new">
                             {% for order in op %}
                                 <tr id="order-{{ order.oid }}">
-                                    <td>{{ order.tableId }}</td>
+                                    <td>{{ order.tableId + 1}}</td>
                                     <td>{{ order.plate.name }}</td>
                                     <td>{{ order.quantity }}</td>
-                                    <td id="action-{{ order.oid }}"><a href="#!" onclick="change({{ order.oid }}, 'tbd', 'new')"><i
+                                    <td id="action-{{ order.oid }}"><a href="#!"
+                                                                       onclick="change({{ order.oid }}, 'tbd', 'new')"><i
                                             class="material-icons">arrow_drop_down</i></a>
                                     </td>
                                 </tr>
@@ -234,7 +262,8 @@
                                     <td>{{ order.tableId }}</td>
                                     <td>{{ order.plate.name }}</td>
                                     <td>{{ order.quantity }}</td>
-                                    <td id="action-{{ order.oid }}"><a href="#!" onclick="change({{ order.oid }}, 2, 'delivered', 'tbd')"><i
+                                    <td id="action-{{ order.oid }}"><a href="#!"
+                                                                       onclick="change({{ order.oid }}, 2, 'delivered', 'tbd')"><i
                                             class="material-icons">arrow_drop_down</i></a>
                                         <a href="#!" onclick="change({{ order.oid }}, 0, 'new', 'tbd')"><i
                                                 class="material-icons">arrow_drop_up</i></a>
@@ -263,7 +292,8 @@
                                     <td>{{ order.tableId }}</td>
                                     <td>{{ order.plate.name }}</td>
                                     <td>{{ order.quantity }}</td>
-                                    <td id="action-{{ order.oid }}"><a href="#!" onclick="change({{ order.oid }}, 1, 'tbd', 'delivered')"><i
+                                    <td id="action-{{ order.oid }}"><a href="#!"
+                                                                       onclick="change({{ order.oid }}, 1, 'tbd', 'delivered')"><i
                                             class="material-icons">arrow_drop_up</i></a>
                                     </td>
                                 </tr>
