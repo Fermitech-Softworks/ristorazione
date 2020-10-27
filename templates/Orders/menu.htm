@@ -123,6 +123,12 @@
                             dishLi.setAttribute("id", "l" + dish['pid'])
                             dishLi.className = "collection-item avatar"
                             dishMasterUl.appendChild(dishLi);
+                            if (dish['link']) {
+                                var image = document.createElement("img");
+                                image.className = "circle";
+                                image.src = dish['link'];
+                                dishLi.appendChild(image);
+                            }
                             var dishName = document.createElement("span")
                             dishName.textContent = dish['name'];
                             dishName.className = "title";
@@ -196,14 +202,13 @@
         }
 
 
-
         function submitOrder() {
             console.log('ping1')
             button = document.getElementById("subButton");
             button.setAttribute("onclick", "return false;")
             socket.emit('newOrder', {json: orders})
             sleep(1000);
-            window.location='{{url_for('page_orders_dashboard', rid=rid)}}';
+            window.location = '{{url_for('page_orders_dashboard', rid=rid)}}';
         }
 
     </script>

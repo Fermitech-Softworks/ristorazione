@@ -1,14 +1,14 @@
 {% extends "stampo.htm" %}
-{% block title %}{{ gettext("Menu creation wizard") }}{% endblock %}
+{% block title %}{% if menu is undefined %}{{ gettext("Menu creation wizard") }}{% else %}{{ gettext("Menu editor") }}{% endif %}{% endblock %}
 {% block extrahead %}
 {% endblock %}
 {% block content %}
     <div class="row">
         <div class="col s12">
-            <form class="col s12" action="/menu/add/{{ rid }}" method="POST">
+            <form class="col s12" {% if menu is undefined %}action="/menu/add/{{ rid }}"{% else %} action="/menu/edit/{{ menu.mid }}/{{ rid }}" {% endif %} method="POST">
                 <div class="row">
                     <div class="input-field col s12">
-                        <input id="name" type="text" class="validate" name="name">
+                        <input id="name" type="text" class="validate" name="name" {% if menu is defined %} value="{{ menu.name }}" {% endif %}>
                         <label for="name">{{ gettext("Menu name") }}</label>
                     </div>
                 </div>

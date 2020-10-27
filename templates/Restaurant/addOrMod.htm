@@ -1,47 +1,76 @@
 {% extends "stampo.htm" %}
-{% block title %}{{ gettext("Restaurant creation wizard") }}{% endblock %}
+{% block title %}{% if restaurant is undefined %}{{ gettext("Restaurant creation wizard") }}{% else %}
+    {{ gettext("Restaurant editor") }} {% endif %}{% endblock %}
+{% block extrahead %}
+    <script>
+        function wait() {
+            master = document.getElementById("master");
+            master.innerHTML = ""
+            let divUpper = document.createElement("div");
+            divUpper.className = "progress";
+            master.appendChild(divUpper);
+            let divIndet = document.createElement("div");
+            divIndet.className="indeterminate";
+            divUpper.appendChild(divIndet);
+        }
+    </script>
+{% endblock %}
 {% block content %}
     <div class="row">
         <div class="col s12">
-            <form class="col s12" action="/restaurant/add" method="POST">
+            <form class="col s12" {% if restaurant is undefined %}action="/restaurant/add" {% else %}
+                  action="/restaurant/edit/{{ restaurant.rid }}" {% endif %} method="POST" enctype=multipart/form-data>
                 <div class="row">
                     <div class="input-field col s6">
-                        <input id="name" type="text" class="validate" name="name">
+                        <input id="name" type="text" class="validate" name="name" {% if restaurant is defined %}
+                               value="{{ restaurant.name }}" {% endif %}>
                         <label for="name">{{ gettext("Restaurant name") }}</label>
                     </div>
                     <div class="input-field col s3">
-                        <input id="tax" type="text" class="validate" name="tax">
+                        <input id="tax" type="text" class="validate" name="tax" {% if restaurant is defined %}
+                               value="{{ restaurant.tax }}" {% endif %}>
                         <label for="tax">{{ gettext("Fixed charge") }}</label>
                     </div>
-                    <div class="input-field col s3">
-                        <input id="numberOfTables" type="text" class="validate" name="numberOfTables">
-                        <label for="numberOfTables">{{ gettext("Number of tables") }}</label>
-                    </div>
+                    {% if restaurant is undefined %}
+                        <div class="input-field col s3">
+                            <input id="numberOfTables" type="text" class="validate" name="numberOfTables">
+                            <label for="numberOfTables">{{ gettext("Number of tables") }}</label>
+                        </div>
+                    {% endif %}
                 </div>
                 <div class="row">
                     <div class="input-field col s5">
-                        <input id="address" type="text" class="validate" name="address">
+                        <input id="address" type="text" class="validate" name="address" {% if restaurant is defined %}
+                               value="{{ restaurant.address }}" {% endif %}>
                         <label for="address">{{ gettext("Address") }}</label>
                     </div>
                     <div class="input-field col s4">
-                        <input id="city" type="text" class="validate" name="city">
+                        <input id="city" type="text" class="validate" name="city" {% if restaurant is defined %}
+                               value="{{ restaurant.city }}" {% endif %}>
                         <label for="city">{{ gettext("City") }}</label>
                     </div>
                     <div class="input-field col s3">
-                        <input id="state" type="text" class="validate" name="state">
+                        <input id="state" type="text" class="validate" name="state" {% if restaurant is defined %}
+                               value="{{ restaurant.state }}" {% endif %}>
                         <label for="state">{{ gettext("State") }}</label>
                     </div>
                 </div>
                 <div class="row">
                     <div class="input-field col s12">
-                        <textarea id="desc" class="materialize-textarea" id="desc" name="desc"></textarea>
+                        <textarea id="desc" class="materialize-textarea" id="desc"
+                                  name="desc">{% if restaurant is defined %}
+                            {{ restaurant.description }}{% endif %}</textarea>
                         <label for="desc">{{ gettext("Description") }}</label>
                     </div>
                 </div>
                 <div class="row">
                     <div class="input-field col s6">
-                        <button class="btn waves-effect waves-light" type="submit"
-                                name="action">{{ gettext("Create") }}
+                        <input type=file name=file id="file">
+                    </div>
+                    <div class="input-field col s6">
+                        <button class="btn waves-effect waves-light" type="submit" onclick="wait()">
+                            {% if restaurant is undefined %}{{ gettext("Create") }}{% else %}
+                                {{ gettext("Update") }}{% endif %}
                             <i class="material-icons right">send</i>
                         </button>
                     </div>
@@ -49,4 +78,5 @@
             </form>
         </div>
     </div>
+    <div class="row" id="master"></div>
 {% endblock %}

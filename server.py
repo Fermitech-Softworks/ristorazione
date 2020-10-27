@@ -2,6 +2,7 @@ from enum import Enum, IntEnum
 from flask import Flask, session, url_for, redirect, request, render_template, abort, flash
 from flask_babel import Babel, gettext
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
 from sqlalchemy import text
 import bcrypt
 import os
@@ -11,7 +12,10 @@ from fuzzywuzzy import process
 from flask_socketio import SocketIO, send, join_room, leave_room, emit, Namespace, disconnect
 import random
 import string
-
+import urllib3
+import base64
+import json
+import pyimgur
 import requests
 
 app = Flask(__name__)
@@ -23,10 +27,12 @@ app.config['LANGUAGES'] = {
     'it': 'Italian'
 }
 app.secret_key = "testing"
-app.config['UPLOAD_FOLDER'] = "./static"
-ALLOWED_EXTENSIONS = set(['txt', 'md', 'pdf', 'doc', 'docx'])
+app.config['UPLOAD_FOLDER'] = "C:\\Users\\loren\\Documents\\GitHub\\ristorazione\\uploads"
+ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
+imgur_id = os.getenv('imgurId')
+imgur_secret = os.getenv('imgurSecret')
 
 
 # DB classes go beyond this point
@@ -50,6 +56,7 @@ class Restaurant(db.Model):
     address = db.Column(db.String)
     state = db.Column(db.String)
     description = db.Column(db.String)
+    link = db.Column(db.String)
     work = db.relationship("Work", back_populates="restaurant")
     menus = db.relationship("MenuAssociation", back_populates="restaurant")
     ownedPlates = db.relationship("Plate", back_populates="restaurant")
@@ -135,6 +142,7 @@ class Plate(db.Model):
     description = db.Column(db.String)
     ingredients = db.Column(db.String)
     cost = db.Column(db.Float, nullable=False)
+    link = db.Column(db.String)
     categories = db.relationship("CategoryAssociation", back_populates="plate")
     order = db.relationship("Order", back_populates="plate")
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
@@ -142,7 +150,7 @@ class Plate(db.Model):
 
     def toJson(self):
         return {'pid': self.pid, 'name': self.name, 'description': self.description, 'ingredients': self.ingredients,
-                'cost': self.cost}
+                'cost': self.cost, 'link':self.link}
 
 
 class CategoryAssociation(db.Model):
@@ -179,6 +187,12 @@ class OrderType(IntEnum):
     submitted = 0
     accepted = 1
     delivered = 2
+
+
+def uploadToImgur(filename):
+    im = pyimgur.Imgur(imgur_id)
+    up_image = im.upload_image(filename, title="")
+    return up_image.link
 
 
 def login(email, password):
@@ -349,7 +363,21 @@ def page_restaurant_add():
     city = request.form.get("city")
     state = request.form.get("state")
     desc = request.form.get("desc")
-    newRestaurant = Restaurant(name=name, tax=tax, city=city, address=address, state=state, description=desc)
+    url = None
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename != '' and file and allowed_file(file.filename):
+            path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+            file.save(path)
+            try:
+                url = uploadToImgur(path)
+            except Exception as e:
+                url = None
+                print(e)
+                pass
+            file.close()
+            os.remove(path)
+    newRestaurant = Restaurant(name=name, tax=tax, city=city, address=address, state=state, description=desc, link=url)
     db.session.add(newRestaurant)
     db.session.commit()
     user.restaurantId = newRestaurant.rid
@@ -362,6 +390,41 @@ def page_restaurant_add():
     db.session.add(newWork)
     db.session.commit()
     return redirect(url_for('page_dashboard'))
+
+
+@app.route("/restaurant/edit/<int:rid>", methods=['GET', 'POST'])
+@login_or_403
+def page_restaurant_edit(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(restaurantId=rid, userEmail=user.email).first()
+    if not check:
+        abort(403)
+        return
+    restaurant = Restaurant.query.get_or_404(rid)
+    if request.method == 'GET':
+        return render_template("Restaurant/addOrMod.htm", user=user, restaurant=restaurant)
+    restaurant.name = request.form.get("name")
+    restaurant.tax = float(request.form.get("tax"))
+    restaurant.address = request.form.get("address")
+    restaurant.city = request.form.get("city")
+    restaurant.state = request.form.get("state")
+    restaurant.description = request.form['desc']
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename != '' and file and allowed_file(file.filename):
+            path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+            file.save(path)
+            try:
+                url = uploadToImgur(path)
+                restaurant.link = url
+            except Exception as e:
+                url = None
+                print(e)
+                pass
+            file.close()
+            os.remove(path)
+    db.session.commit()
+    return redirect(url_for('page_restaurant_management', rid=rid))
 
 
 @app.route("/restaurant/<int:rid>/info", methods=['GET', 'POST'])
@@ -471,6 +534,22 @@ def page_menu_add(rid):
         return redirect(url_for("page_menu_details", mid=newMenu.mid, rid=rid))
 
 
+@app.route("/menu/edit/<int:mid>/<int:rid>", methods=['GET', 'POST'])
+@login_or_403
+def page_menu_edit(mid, rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    menu = Menu.query.get_or_404(mid)
+    if request.method == 'GET':
+        return render_template("Menu/addOrMod.htm", user=user, rid=rid, menu=menu)
+    menu.name = request.form.get("name")
+    db.session.commit()
+    return redirect(url_for('page_restaurant_management', rid=rid))
+
+
 @app.route("/restaurant/<int:rid>/menu/<int:mid>")
 def page_menu_inspect(rid, mid):
     menu = Menu.query.get_or_404(mid)
@@ -529,10 +608,56 @@ def page_dish_add(rid):
     description = request.form.get('description')
     ingredients = request.form.get('ingredients')
     cost = float(request.form.get('cost'))
-    newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost, restaurant_id=rid)
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename != '' and file and allowed_file(file.filename):
+            path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+            file.save(path)
+            try:
+                url = uploadToImgur(path)
+            except Exception as e:
+                url = None
+                print(e)
+                pass
+            file.close()
+            os.remove(path)
+    newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost, restaurant_id=rid, link=url)
     db.session.add(newDish)
     db.session.commit()
     print(rid)
+    return redirect(url_for("page_restaurant_management", rid=rid))
+
+
+@app.route("/plate/edit/<int:pid>/<int:rid>", methods=['GET', 'POST'])
+@login_or_403
+def page_dish_edit(pid, rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    plate = Plate.query.get_or_404(pid)
+    if request.method == "GET":
+        return render_template("Menu/Plate/addOrMod.htm", user=user, rid=rid, plate=plate)
+    plate.name = request.form.get("name")
+    plate.description = request.form.get("description")
+    plate.ingredients = request.form.get("ingredients")
+    plate.cost = float(request.form.get("cost"))
+    if 'file' in request.files:
+        file = request.files['file']
+        if file.filename != '' and file and allowed_file(file.filename):
+            path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+            file.save(path)
+            try:
+                url = uploadToImgur(path)
+                plate.link = url
+            except Exception as e:
+                url = None
+                print(e)
+                pass
+            file.close()
+            os.remove(path)
+    db.session.commit()
     return redirect(url_for("page_restaurant_management", rid=rid))
 
 
@@ -774,6 +899,8 @@ def updaterHandler(json):  # {'oid': oid, 'status': statusDict[newLevel], 'oldSt
     if json['status'] < 0 or json['status'] > 2:
         return
     order = Order.query.filter_by(oid=json['oid']).first()
+    if not order:
+        return "404"
     order.status = json['status']
     json['name'] = order.plate.name
     db.session.commit()

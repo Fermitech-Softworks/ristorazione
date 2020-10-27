@@ -119,6 +119,12 @@
                             var dishLi = document.createElement("li");
                             dishLi.setAttribute("id", "l"+dish['pid'])
                             dishLi.className = "collection-item avatar"
+                            if(dish['link']){
+                                var image = document.createElement("img");
+                                image.className = "circle";
+                                image.src = dish['link'];
+                                dishLi.appendChild(image);
+                            }
                             dishMasterUl.appendChild(dishLi);
                             var dishName = document.createElement("span")
                             dishName.textContent = dish['name'];

@@ -10,6 +10,10 @@
 a{
     color: #ff6f00;
 }
+
+.progress .indeterminate{
+    background-color: #ff6f00;
+}
 .default-jumbotron h1 {
     margin-top: 1rem;
 }
