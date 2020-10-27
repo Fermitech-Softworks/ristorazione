@@ -3,6 +3,7 @@ from flask import Flask, session, url_for, redirect, request, render_template, a
 from flask_babel import Babel, gettext
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
+import werkzeug.middleware.proxy_fix
 from sqlalchemy import text
 import bcrypt
 import os
@@ -33,6 +34,7 @@ db = SQLAlchemy(app)
 socketio = SocketIO(app)
 imgur_id = os.getenv('imgurId')
 imgur_secret = os.getenv('imgurSecret')
+reverse_proxy_app = werkzeug.middleware.proxy_fix.ProxyFix(app=app, x_for=1, x_proto=0, x_host=1, x_port=0, x_prefix=0)
 
 
 # DB classes go beyond this point

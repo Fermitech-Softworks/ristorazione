@@ -210,7 +210,9 @@
                                         <tr>
                                             <td>{{ ownedPlate.name }}</td>
                                             <td>{{ ownedPlate.cost }}</td>
-                                            <td></td>
+                                            <td>
+                                                <a href="/plate/edit/{{ ownedPlate.pid }}/{{ ownedPlate.restaurant_id }}"><i
+                                                        class="material-icons">create</i></a></td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>
@@ -234,16 +236,22 @@
                         {% for association in data.menus %}
                             <tr>
                                 <td>{{ association.menu.name }}</td>
-                                <td>{% if association.menu.enabled == True %}{{ gettext("Yes") }}{% else %}{{ gettext("No") }}{% endif %}</td>
-                                <td><a href="/restaurant/{{ association.restaurantId }}/menu/details/{{ association.menuId }}"><i class="material-icons">create</i></a></td>
+                                <td>{% if association.menu.enabled == True %}{{ gettext("Yes") }}{% else %}
+                                    {{ gettext("No") }}{% endif %}</td>
+                                <td>
+                                    <a href="/restaurant/{{ association.restaurantId }}/menu/details/{{ association.menuId }}"><i
+                                            class="material-icons">book</i></a> <a
+                                        href="/menu/edit/{{ association.menuId }}/{{ association.restaurantId }}"><i
+                                        class="material-icons">create</i></a></td>
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 <div id="settings" class="col s12" style="background-color:#fafafa; color: #ff6f00">
-                    <h3>{{ gettext("Lorem ipsum?") }}</h3>
-                    <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                    <h3>{{ gettext("Settings and miscellaneous content") }}</h3>
+                    <p> {{ gettext("To change this restaurant data, ") }}
+                        <a class="btn waves-effect waves-light" href="/restaurant/edit/{{ data.rid }}">{{ gettext("click here") }}</a></p>
                 </div>
             </div>
         </div>
