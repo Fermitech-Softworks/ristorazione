@@ -1,0 +1,20 @@
+{% extends "stampo.htm" %}
+{% block title %} {{ gettext("Ristorazione Monthly subscription page") }} {% endblock %}
+{% block extrahead %}
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        function go(){
+            const stripe = Stripe("{{ key }}")
+            fetch("/create-checkout-session/{{ subscription.sid }}/{{ restaurant.rid }}")
+            .then((result)=> {return result.json();})
+            .then((data)=>{return stripe.redirectToCheckout({sessionId: data.sessionId})})
+        }
+    </script>
+{% endblock %}
+{% block content %}
+    <h3>{{ gettext("You are about to subscribe to") }} {{ subscription.name }}.</h3>
+    <p class="flow-text">{{ subscription.description }}</p>
+    <p class="flow-text">{{ gettext("This subscription costs ") }} {{ subscription.monthlyCost / subscription.duration }} {{ gettext(" € per month, and can be cancelled at any time.") }}</p>
+    <p class="flow-text">{{ gettext("Please note that the subscription system on Ristorazione is connected to the restaurant, not to the user.") }}</p>
+    <button class="btn waves-effect waves-light" onclick="go()">{{ gettext("Click here to access the payment processor website.") }}</button>
+{% endblock %}

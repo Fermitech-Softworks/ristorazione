@@ -13,7 +13,9 @@
     {% endblock %}
 </head>
 <body {% if invert is defined %}style="background-color: #ff6f00"{% endif %}>
+{% if hidebar is not defined %}
 {% include 'nav.htm' %}
+{% endif %}
 <br>
 <div class="container">
     {% block content %}{% endblock %}

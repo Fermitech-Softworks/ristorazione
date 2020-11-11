@@ -4,7 +4,7 @@ from flask_babel import Babel, gettext
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 import werkzeug.middleware.proxy_fix
-from sqlalchemy import text
+from sqlalchemy import text, desc
 import bcrypt
 import os
 import datetime
@@ -18,6 +18,8 @@ import base64
 import json
 import pyimgur
 import requests
+import stripe
+import calendar
 
 app = Flask(__name__)
 babel = Babel(app)
@@ -34,8 +36,10 @@ db = SQLAlchemy(app)
 socketio = SocketIO(app)
 imgur_id = os.getenv('imgurId')
 imgur_secret = os.getenv('imgurSecret')
+stripe_public = os.getenv('stripePublic')
+stripe_private = os.getenv('stripePrivate')
 reverse_proxy_app = werkzeug.middleware.proxy_fix.ProxyFix(app=app, x_for=1, x_proto=0, x_host=1, x_port=0, x_prefix=0)
-
+paymentSessions = []
 
 # DB classes go beyond this point
 
@@ -92,9 +96,9 @@ class SubscriptionAssociation(db.Model):
     __tablename__ = "subscriptionsAssociation"
     restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
     subscriptionId = db.Column(db.Integer, db.ForeignKey('subscription.sid'), primary_key=True)
-    nextPayment = db.Column(db.DateTime, nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="sub")
     subscription = db.relationship("Subscription", back_populates="sub")
+    last_validity = db.Column(db.DateTime, nullable=False)
 
 
 class Table(db.Model):
@@ -152,7 +156,7 @@ class Plate(db.Model):
 
     def toJson(self):
         return {'pid': self.pid, 'name': self.name, 'description': self.description, 'ingredients': self.ingredients,
-                'cost': self.cost, 'link':self.link}
+                'cost': self.cost, 'link': self.link}
 
 
 class CategoryAssociation(db.Model):
@@ -174,6 +178,14 @@ class Order(db.Model):
     table = db.relationship("Table", back_populates="order")
     plate = db.relationship("Plate", back_populates="order")
     restaurant = db.relationship("Restaurant", back_populates="orders")
+
+
+class Transaction(db.Model):
+    __tablename__ = "transaction"
+    paymentId = db.Column(db.String, primary_key=True)
+    sid = db.Column(db.Integer, primary_key=True)
+    rid = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, default=True)
 
 
 # UTILITIES
@@ -904,7 +916,7 @@ def page_plate_delete(rid, pid):
         abort(403)
     db.session.delete(plate)
     db.session.commit()
-    return redirect(url_for("page_restaurant_management", rid=rid)+"#menus")
+    return redirect(url_for("page_restaurant_management", rid=rid) + "#menus")
 
 
 @app.route("/restaurant/<int:rid>/category/<int:cid>/plate/<int:pid>/remove", methods=['POST'])
@@ -937,7 +949,7 @@ def page_personnel_remove(rid, email):
     return redirect(url_for("page_restaurant_management", rid=rid))
 
 
-@app.route("/delete/<int:rid>/<elementId>/<string:type>/<int:mode>") # if mode = 1, delete
+@app.route("/delete/<int:rid>/<elementId>/<string:type>/<int:mode>")  # if mode = 1, delete
 @login_or_403
 def page_delete(rid, elementId, type, mode):
     if mode == 0:
@@ -974,6 +986,7 @@ def page_delete(rid, elementId, type, mode):
         return redirect(url_for('page_dashboard'))
     else:
         return redirect(url_for('page_restaurant_management', rid=rid))
+
 
 # Socket definitions go below
 
@@ -1039,6 +1052,89 @@ def updaterHandler(json):  # {'oid': oid, 'status': statusDict[newLevel], 'oldSt
     json['name'] = order.plate.name
     db.session.commit()
     emit('updateOrderStatus', json, room=json['rid'], json=True)
+
+
+# Payments pages
+
+@app.route("/restaurant/<int:rid>/subscribe/<int:sid>")
+@login_or_403
+def page_subscribe(rid, sid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    sub = Subscription.query.get_or_404(sid)
+    res = Restaurant.query.get_or_404(rid)
+    return render_template("Subscriptions/request.htm", user=user, restaurant=res, subscription=sub, key=stripe_public)
+
+
+@app.route("/create-checkout-session/<int:sid>/<int:rid>")
+def create_checkout_session(sid, rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    subscription = Subscription.query.get_or_404(sid)
+    stripe.api_key = stripe_private
+    domain_url = base_url + "/"
+    data = request.get_json()
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            success_url=domain_url + "success/{CHECKOUT_SESSION_ID}",
+            cancel_url=domain_url + "cancelled",
+            payment_method_types=["card"],
+            mode="payment",
+            line_items=[
+                {
+                    "name": subscription.name,
+                    "quantity": 1,
+                    "currency": "eur",
+                    "amount": int(subscription.monthlyCost)*100,
+                }
+            ]
+        )
+        transaction = Transaction(paymentId=checkout_session['id'], sid=sid, rid=rid)
+        db.session.add(transaction)
+        db.session.commit()
+        return {"sessionId": checkout_session["id"]}
+    except Exception as e:
+        abort(403)
+
+
+@app.route("/success/<sessionId>")
+def success(sessionId):
+    check = Transaction.query.filter_by(paymentId=sessionId, enabled=True).first()
+    if not check:
+        abort(403)
+    check.enabled = False
+    association = SubscriptionAssociation.query.filter_by(subscriptionId=check.sid, restaurantId=check.rid).first()
+    subscription = Subscription.query.get_or_404(check.sid)
+    if not association:
+        today = datetime.date.today()
+        lastDay = add_months(today, subscription.duration)
+        newsub = SubscriptionAssociation(restaurantId=check.rid, subscriptionId=check.sid, last_validity=lastDay)
+        db.session.add(newsub)
+    else:
+        today = association.last_validity
+        lastDay = add_months(today, subscription.duration)
+        association.last_validity =lastDay
+    db.session.commit()
+    return render_template("Subscriptions/result.htm", sessionId=sessionId, mode="success", hidebar=True, invert=True)
+
+
+def add_months(sourcedate, months):
+    month = sourcedate.month - 1 + months
+    year = sourcedate.year + month // 12
+    month = month % 12 + 1
+    day = min(sourcedate.day, calendar.monthrange(year,month)[1])
+    return datetime.date(year, month, day)
+
+
+@app.route("/cancelled")
+def cancelled():
+    return render_template("Subscriptions/result.htm", user=user, mode="fail")
 
 
 if __name__ == "__main__":
