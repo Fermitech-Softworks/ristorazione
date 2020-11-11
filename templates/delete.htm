@@ -1,0 +1,17 @@
+{% extends "stampo.htm" %}
+{% block title %} {{ gettext("Removal Alert") }} {% endblock %}
+{% block content %}
+    <h2>{{ gettext("Warning!") }}</h2>
+    <p class="flow-text">{{ gettext("You are trying to delete a {}, which is connected to other elements.".format(type)) }} </p>
+    {% if type == "menu" %}
+    <p class="flow-text">{{ gettext("The categories within this menu will be destroyed, and so will be the connected orders. However, the plates won't be deleted.") }}</p>
+    {% elif type == "restaurant" %}
+    <p class="flow-text">{{ gettext("The menues, the plates, the tables, the orders, the subscriptions and the work relationships will be deleted.") }}
+    {% elif type == "user" %}
+    <p class="flow-text">{{ gettext("All your work relationships will be deleted, and so will be the restaurants that after the deletion of your account will no longer have a manager.") }}
+    {% elif type == "table" %}
+    <p class="flow-text">{{ gettext("All the orders from this table will be deleted.") }}
+    {% endif %}
+    <h2>{{ gettext("A deletion action is irreversible.") }}</h2>
+    <a href="/delete/{{ rid }}/{{ elementId }}/{{ type }}/1">{{ gettext("I know what I'm doing, proceed.") }}</a>
+{% endblock %}

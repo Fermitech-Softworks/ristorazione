@@ -47,7 +47,7 @@ class User(db.Model):
     name = db.Column(db.String, nullable=False)
     surname = db.Column(db.String, nullable=False)
     isAdmin = db.Column(db.Boolean, nullable=False)
-    work = db.relationship("Work", back_populates="user")
+    work = db.relationship("Work", back_populates="user", cascade="all, delete")
 
 
 class Restaurant(db.Model):
@@ -59,13 +59,13 @@ class Restaurant(db.Model):
     state = db.Column(db.String)
     description = db.Column(db.String)
     link = db.Column(db.String)
-    work = db.relationship("Work", back_populates="restaurant")
-    menus = db.relationship("MenuAssociation", back_populates="restaurant")
-    ownedPlates = db.relationship("Plate", back_populates="restaurant")
+    work = db.relationship("Work", back_populates="restaurant", cascade="all, delete")
+    menus = db.relationship("MenuAssociation", back_populates="restaurant", cascade="all, delete")
+    ownedPlates = db.relationship("Plate", back_populates="restaurant", cascade="all, delete")
     tax = db.Column(db.Float, nullable=False)
-    tables = db.relationship("Table", back_populates="restaurant")
-    sub = db.relationship("SubscriptionAssociation", back_populates="restaurant")
-    orders = db.relationship("Order", back_populates="restaurant")
+    tables = db.relationship("Table", back_populates="restaurant", cascade="all, delete")
+    sub = db.relationship("SubscriptionAssociation", back_populates="restaurant", cascade="all, delete")
+    orders = db.relationship("Order", back_populates="restaurant", cascade="all, delete")
 
 
 class Work(db.Model):
@@ -85,7 +85,7 @@ class Subscription(db.Model):
     monthlyCost = db.Column(db.Float, nullable=False)
     level = db.Column(db.Integer, nullable=False)
     duration = db.Column(db.Integer, nullable=False)  # Number of months
-    sub = db.relationship("SubscriptionAssociation", back_populates="subscription")
+    sub = db.relationship("SubscriptionAssociation", back_populates="subscription", cascade="all, delete")
 
 
 class SubscriptionAssociation(db.Model):
@@ -111,8 +111,8 @@ class Menu(db.Model):
     mid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.Integer, nullable=False)
     enabled = db.Column(db.Boolean, nullable=False)
-    restaurants = db.relationship("MenuAssociation", back_populates="menu")
-    topLevelCategories = db.relationship("Category", back_populates="menu")
+    restaurants = db.relationship("MenuAssociation", back_populates="menu", cascade="all, delete")
+    topLevelCategories = db.relationship("Category", back_populates="menu", cascade="all, delete")
 
 
 class MenuAssociation(db.Model):
@@ -130,8 +130,8 @@ class Category(db.Model):
     menuId = db.Column(db.Integer, db.ForeignKey("menu.mid"))
     menu = db.relationship("Menu", back_populates="topLevelCategories")
     parentId = db.Column(db.Integer, db.ForeignKey("category.cid"))
-    children = db.relationship("Category", backref=db.backref('parent', remote_side=[cid]))
-    plates = db.relationship("CategoryAssociation", back_populates="category")
+    children = db.relationship("Category", backref=db.backref('parent', remote_side=[cid]), cascade="all, delete")
+    plates = db.relationship("CategoryAssociation", back_populates="category", cascade="all, delete")
 
     def toJson(self):
         return {'cid': self.cid, 'name': self.name}
@@ -145,8 +145,8 @@ class Plate(db.Model):
     ingredients = db.Column(db.String)
     cost = db.Column(db.Float, nullable=False)
     link = db.Column(db.String)
-    categories = db.relationship("CategoryAssociation", back_populates="plate")
-    order = db.relationship("Order", back_populates="plate")
+    categories = db.relationship("CategoryAssociation", back_populates="plate", cascade="all, delete")
+    order = db.relationship("Order", back_populates="plate", cascade="all, delete")
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="ownedPlates")
 
@@ -340,6 +340,21 @@ def page_register():
     db.session.add(newUser)
     db.session.commit()
     return redirect(url_for('page_login'))
+
+
+@app.route('/user/<string:email>/edit', methods=['POST'])
+@login_or_403
+def page_user_edit(email):
+    user = find_user(session['email'])
+    if user.email != email:
+        abort(403)
+    pass
+    if request.form['password'] != '':
+        user.passeword = bcrypt.hashpw(bytes(request.form['password'], encoding='utf-8'), bcrypt.gensalt())
+    user.name = request.form['name']
+    user.surname = request.form['surname']
+    db.session.commit()
+    return redirect(url_for('page_dashboard'))
 
 
 @app.route("/dashboard")
@@ -630,6 +645,22 @@ def page_dish_add(rid):
     return redirect(url_for("page_restaurant_management", rid=rid))
 
 
+@app.route("/restaurant/<int:rid>/category/<int:cid>/edit", methods=['GET', 'POST'])
+@login_or_403
+def page_category_edit(rid, cid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    category = Category.query.get_or_404(cid)
+    if request.method == "GET":
+        return render_template("Menu/Category/edit.htm", user=user, rid=rid, category=category)
+    category.name = request.form.get('name')
+    db.session.commit()
+    return redirect(url_for('page_menu_details', rid=rid, mid=category.menuId))
+
+
 @app.route("/plate/edit/<int:pid>/<int:rid>", methods=['GET', 'POST'])
 @login_or_403
 def page_dish_edit(pid, rid):
@@ -842,6 +873,107 @@ def page_order_submit(rid, tid):
 def page_about():
     return render_template("about.htm")
 
+
+# Item deletion functions
+
+@app.route("/restaurant/<int:rid>/category/<int:cid>/delete")
+@login_or_403
+def page_category_del(rid, cid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    category = Category.query.get_or_404(cid)
+    mid = category.menuId
+    db.session.delete(category)
+    db.session.commit()
+    return redirect(url_for('page_menu_details', rid=rid, mid=mid))
+
+
+@app.route("/restaurant/<int:rid>/plate/<int:pid>/delete")
+@login_or_403
+def page_plate_delete(rid, pid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    plate = Plate.query.get_or_404(pid)
+    if plate.restaurant_id != rid:
+        abort(403)
+    db.session.delete(plate)
+    db.session.commit()
+    return redirect(url_for("page_restaurant_management", rid=rid)+"#menus")
+
+
+@app.route("/restaurant/<int:rid>/category/<int:cid>/plate/<int:pid>/remove", methods=['POST'])
+@login_or_403
+def page_plate_remove_from_menu(rid, cid, pid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    assoc = CategoryAssociation.query.filter_by(plateId=pid, categoryId=cid).first()
+    db.session.delete(assoc)
+    db.session.commit()
+    return "200"
+
+
+@app.route("/restaurant/<int:rid>/personnel/<string:email>/remove")
+@login_or_403
+def page_personnel_remove(rid, email):
+    user = find_user(session['email'])
+    if email == user.email:
+        return redirect(url_for("page_restaurant_management", rid=rid))
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    work = Work.query.filter_by(userEmail=email, restaurantId=rid).first()
+    db.session.delete(work)
+    db.session.commit()
+    return redirect(url_for("page_restaurant_management", rid=rid))
+
+
+@app.route("/delete/<int:rid>/<elementId>/<string:type>/<int:mode>") # if mode = 1, delete
+@login_or_403
+def page_delete(rid, elementId, type, mode):
+    if mode == 0:
+        return render_template("delete.htm", rid=rid, elementId=elementId, type=type)
+    user = find_user(session['email'])
+    if not type == "user":
+        check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+        if not check:
+            abort(403)
+            return
+        if type == "menu":
+            element = Menu.query.get_or_404(elementId)
+            if not MenuAssociation.query.filter_by(menuId=elementId, restaurantId=rid).first():
+                abort(403)
+        if type == "restaurant":
+            element = Restaurant.query.get_or_404(elementId)
+        if type == "table":
+            element = Table.query.get_or_404(elementId)
+            if element.restaurantId != rid:
+                abort(403)
+    elif type == "user":
+        element = User.query.get_or_404(elementId)
+        if element.email != user.email and not user.isAdmin:
+            abort(403)
+    db.session.delete(element)
+    db.session.commit()
+    if type == "user":
+        if not Work.query.filter_by(restaurantId=rid, type=UserType.owner).first():
+            restaurant = Restaurant.query.get_or_404(rid)
+            db.session.delete(restaurant)
+            db.session.commit()
+        return redirect(url_for('page_root'))
+    if type == "restaurant":
+        return redirect(url_for('page_dashboard'))
+    else:
+        return redirect(url_for('page_restaurant_management', rid=rid))
 
 # Socket definitions go below
 

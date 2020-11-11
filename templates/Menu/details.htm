@@ -132,6 +132,24 @@
             xhr.send(parametri)
         }
 
+        function deleteDish(pid, cid){
+            let xhr = new XMLHttpRequest();
+            var refLi = document.getElementById("pl"+pid)
+            errBox = document.getElementById("error")
+            errBox.innerHTML = ""
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        refLi.remove()
+                    } else {
+                        errBox.innerHTML = xhr.statusText
+                    }
+                }
+            });
+            xhr.open("POST", "/restaurant/"+{{ rid }}+"/category/"+cid+"/plate/"+pid+"/remove", true)
+            xhr.send()
+        }
+
 
         function loadData(cid, mid) {
 
@@ -250,9 +268,15 @@
                         column.appendChild(dishMasterUl);
                         for (const dish of dishes) {
                             var dishLi = document.createElement("li");
-                            dishLi.setAttribute("id", "l" + dish['pid'])
+                            dishLi.setAttribute("id", "pl" + dish['pid'])
                             dishLi.className = "collection-item avatar"
                             dishMasterUl.appendChild(dishLi);
+                            var deleteLink = document.createElement("a");
+                            deleteLink.href="#";
+                            deleteLink.className = "secondary-content";
+                            deleteLink.text="X";
+                            deleteLink.setAttribute("onclick", "deleteDish(" + dish['pid'] + "," + cid + ")");
+                            dishLi.appendChild(deleteLink);
                             if (dish['link']) {
                                 var image = document.createElement("img");
                                 image.className = "circle";
@@ -288,8 +312,8 @@
     <ul class="collapsible" id="l0" data-collapsible="accordion">
         {% for cat in menu.topLevelCategories %}
             <li>
-                <div class="collapsible-header" onclick="loadData({{ cat.cid }}, {{ menu.mid }})"><i
-                        class="material-icons">filter_drama</i>{{ cat.name }}</div>
+                <div class="collapsible-header" onclick="loadData({{ cat.cid }}, {{ menu.mid }})"><a href="/restaurant/{{ rid }}/category/{{ cat.cid }}/edit"><i
+                        class="material-icons">create</i></a>{{ cat.name }}</div>
                 <div class="collapsible-body" id="c{{ cat.cid }}"></div>
             </li>
         {% endfor %}
