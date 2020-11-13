@@ -858,7 +858,7 @@ def page_order_getPlate(oid):
     ans = order.plate.toJson()
     cost = order.costOverride
     if not order.costOverride:
-        cost = 0
+        cost = order.plate.cost
     ans['override']={'desc': order.specialReq, 'cost': cost, 'tid': order.tableId, 'oid': order.oid}
     return ans
 
@@ -876,7 +876,7 @@ def page_table_close(tid):
     for order in table.order:
         if order.costOverride:
             cost=order.costOverride
-            name = order.plate.name + " *"
+            name = order.plate.name + " - " + order.specialReq
         else:
             cost=order.plate.cost
             name=order.plate.name

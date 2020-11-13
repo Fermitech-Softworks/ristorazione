@@ -9,10 +9,12 @@
         $(document).ready(function () {
             $('.modal').modal();
             $('.collapsible').collapsible();
-            socket.on('connect', function () {
-                socket.emit('connectPersonnel', rid ={{ rid }})
-                M.toast({html: '{{ gettext("Connection with the server has been established.") }}'})
-            });
+            socket.emit('connectPersonnel', rid ={{ rid }})
+            M.toast({html: '{{ gettext("Connection with the server has been established.") }}'})
+            //socket.on('connect', function () { Apparently chrome hates this.
+            //    socket.emit('connectPersonnel', rid ={{ rid }})
+            //    M.toast({html: '{{ gettext("Connection with the server has been established.") }}'})
+            //});
             socket.on('ping', function () {
                 console.log("ping")
             });
@@ -87,6 +89,7 @@
                     actionSpace.appendChild(backButton);
                 }
                 newTab.appendChild(oldRow);
+
             });
         });
 
@@ -101,6 +104,8 @@
                         response = JSON.parse(xhr.responseText);
                         refDiv.innerText = response['token']
                         refDiv.style = "font-family: consolas; font-size: 150%";
+                    } else {
+                        M.toast({html: '{{ gettext("Something went wrong while getting token data.") }}'})
                     }
                 }
             });
@@ -124,7 +129,7 @@
                             refUl.appendChild(newLi)
                             let internalDiv = document.createElement("div");
                             internalDiv.innerText = o['name'];
-                            internalDiv.id = "order"+o['oid'];
+                            internalDiv.id = "order" + o['oid'];
                             internalDiv.innerText = internalDiv.innerText + " x" + o['qty'] + ", for each " + o['cost'] + "€.";
                             if (o['custom'] === "true") {
                                 internalDiv.innerText = internalDiv.innerText + "{{ gettext("(custom)") }}";
@@ -137,6 +142,8 @@
                             }
                             newLi.appendChild(internalDiv);
                         }
+                    } else {
+                        M.toast({html: '{{ gettext("Something went wrong while getting orders.") }}'})
                     }
                 }
             });
@@ -166,7 +173,10 @@
                         }
                         mwindow.print()
                         prepareModal(tid, rid)
+                    } else {
+                        M.toast({html: '{{ gettext("Something went wrong while closing the table.") }}'})
                     }
+
                 }
             });
             xhr.open("POST", "/table/" + tid + "/close", true);
@@ -188,31 +198,32 @@
                     if (xhr.status === 200) {
                         let response = JSON.parse(xhr.responseText);
                         console.log(response)
-                        let refdiv = document.getElementById("order"+oid);
+                        let refdiv = document.getElementById("order" + oid);
                         let maindiv;
-                        try{
-                            maindiv = document.getElementById("customDiv"+oid);
-                            maindiv.innerText=""
-                        }
-                        catch (error) {
+                        try {
+                            maindiv = document.getElementById("customDiv" + oid);
+                            maindiv.innerText = ""
+                        } catch (error) {
                             maindiv = document.createElement("div");
                             maindiv.id = "customDiv" + oid;
                             refdiv.appendChild(maindiv)
                         }
                         let text = document.createElement("textarea");
-                        text.value=response['override']['desc']
-                        text.id = "orderCustom"+oid;
+                        text.value = response['override']['desc']
+                        text.id = "orderCustom" + oid;
                         maindiv.appendChild(text);
                         let cost = document.createElement("input");
-                        cost.id = "orderCustomCost"+oid;
+                        cost.id = "orderCustomCost" + oid;
                         cost.value = response['override']['cost'];
                         let button = document.createElement("a");
-                        button.href="#"
-                        button.setAttribute("onclick", "sendCustomData("+oid+","+rid+")")
+                        button.href = "#"
+                        button.setAttribute("onclick", "sendCustomData(" + oid + "," + rid + ")")
                         button.text = "{{ gettext("Update") }}"
                         button.className = "waves-effect waves-light btn"
                         maindiv.appendChild(cost)
                         maindiv.appendChild(button)
+                    } else {
+                        M.toast({html: '{{ gettext("Something went wrong while loading order details.") }}'})
                     }
                 }
             });
@@ -222,20 +233,22 @@
             xhr.send(parametri);
         }
 
-        function sendCustomData(oid, rid){
+        function sendCustomData(oid, rid) {
             let xhr = new XMLHttpRequest();
             xhr.addEventListener("readystatechange", function () {
                 if (xhr.readyState === 4) {
                     if (xhr.status === 200) {
-
+                        M.toast({html: '{{ gettext("Order update was successful.") }}'})
+                    } else {
+                        M.toast({html: '{{ gettext("Something went wrong while updating custom order.") }}'})
                     }
                 }
             });
-            let textBox = document.getElementById("orderCustom"+oid)
-            let costBox = document.getElementById("orderCustomCost"+oid)
-            xhr.open("POST", "/order/"+oid+"/setCustom", true)
+            let textBox = document.getElementById("orderCustom" + oid)
+            let costBox = document.getElementById("orderCustomCost" + oid)
+            xhr.open("POST", "/order/" + oid + "/setCustom", true)
             xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            let parametri = "rid="+rid+"&costOverride="+costBox.value+"&special="+textBox.value;
+            let parametri = "rid=" + rid + "&costOverride=" + costBox.value + "&special=" + textBox.value;
             xhr.send(parametri);
         }
 
