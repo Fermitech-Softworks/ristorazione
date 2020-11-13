@@ -20,6 +20,7 @@ import pyimgur
 import requests
 import stripe
 import calendar
+import urllib
 
 app = Flask(__name__)
 babel = Babel(app)
@@ -38,6 +39,7 @@ imgur_id = os.getenv('imgurId')
 imgur_secret = os.getenv('imgurSecret')
 stripe_public = os.getenv('stripePublic')
 stripe_private = os.getenv('stripePrivate')
+base_url = os.getenv('baseUrl')
 reverse_proxy_app = werkzeug.middleware.proxy_fix.ProxyFix(app=app, x_for=1, x_proto=0, x_host=1, x_port=0, x_prefix=0)
 paymentSessions = []
 
@@ -178,6 +180,8 @@ class Order(db.Model):
     table = db.relationship("Table", back_populates="order")
     plate = db.relationship("Plate", back_populates="order")
     restaurant = db.relationship("Restaurant", back_populates="orders")
+    specialReq = db.Column(db.String)
+    costOverride = db.Column(db.Float)
 
 
 class Transaction(db.Model):
@@ -242,6 +246,21 @@ def login_or_403(f):
     @functools.wraps(f)
     def func(*args, **kwargs):
         if not session.get("email"):
+            abort(403)
+            try:
+                disconnect()
+            except Exception:
+                pass
+            return
+        return f(*args, **kwargs)
+
+    return func
+
+
+def admin_or_403(f):
+    @functools.wraps(f)
+    def func(*args, **kwargs):
+        if not session.get("email") or not find_user(session.get("email")).isAdmin:
             abort(403)
             try:
                 disconnect()
@@ -459,7 +478,7 @@ def page_restaurant_edit(rid):
 @app.route("/restaurant/<int:rid>/info", methods=['GET', 'POST'])
 def page_restaurant_info(rid):
     restaurant = Restaurant.query.get_or_404(rid)
-    return render_template("Restaurant/info.htm", restaurant=restaurant)
+    return render_template("Restaurant/info.htm", restaurant=restaurant, address=urllib.parse.quote(restaurant.address), state=urllib.parse.quote(restaurant.state), city=urllib.parse.quote(restaurant.city))
 
 
 @app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
@@ -637,6 +656,7 @@ def page_dish_add(rid):
     description = request.form.get('description')
     ingredients = request.form.get('ingredients')
     cost = float(request.form.get('cost'))
+    url = None
     if 'file' in request.files:
         file = request.files['file']
         if file.filename != '' and file and allowed_file(file.filename):
@@ -800,9 +820,47 @@ def page_table_get_orders(tid):
     table = Table.query.get_or_404((tid, rid))
     response = {'orders': []}
     for order in table.order:
-        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': order.plate.cost, 'qty': order.quantity}
+        custom = "false"
+        cost = order.plate.cost
+        if order.specialReq:
+            custom = "true"
+            if order.costOverride:
+                cost=order.costOverride
+        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': cost, 'qty': order.quantity, 'custom': custom, 'oid':order.oid, 'rid':order.restaurantId, 'tid':tid}
         response['orders'].append(tmp)
     return response
+
+
+@app.route("/order/<int:oid>/setCustom", methods=['POST'])
+@login_or_403
+def page_order_setCustom(oid):
+    rid = request.form.get('rid')
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        abort(403)
+    order = Order.query.get_or_404(oid)
+    order.costOverride = float(request.form.get('costOverride'))
+    order.specialReq = request.form.get('special')
+    db.session.commit()
+    return "200"
+
+
+@app.route("/order/<int:oid>/getPlate", methods=['POST'])
+@login_or_403
+def page_order_getPlate(oid):
+    rid = request.form.get('rid')
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid).first()
+    if not check or check.type < UserType.waiter:
+        abort(403)
+    order = Order.query.get_or_404(oid)
+    ans = order.plate.toJson()
+    cost = order.costOverride
+    if not order.costOverride:
+        cost = 0
+    ans['override']={'desc': order.specialReq, 'cost': cost, 'tid': order.tableId, 'oid': order.oid}
+    return ans
 
 
 @app.route("/table/<int:tid>/close", methods=['POST'])
@@ -816,7 +874,13 @@ def page_table_close(tid):
     table = Table.query.get_or_404((tid, rid))
     response = {'orders': []}
     for order in table.order:
-        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': order.plate.cost * order.quantity,
+        if order.costOverride:
+            cost=order.costOverride
+            name = order.plate.name + " *"
+        else:
+            cost=order.plate.cost
+            name=order.plate.name
+        tmp = {'pid': order.plate.pid, 'name': name, 'cost': cost * order.quantity,
                'qty': order.quantity}
         response['orders'].append(tmp)
         db.session.delete(order)
@@ -883,7 +947,8 @@ def page_order_submit(rid, tid):
 
 @app.route("/about")
 def page_about():
-    return render_template("about.htm")
+    subscriptions = Subscription.query.order_by(desc(Subscription.duration)).all()
+    return render_template("about.htm", subscriptions=subscriptions)
 
 
 # Item deletion functions
@@ -988,6 +1053,18 @@ def page_delete(rid, elementId, type, mode):
         return redirect(url_for('page_restaurant_management', rid=rid))
 
 
+@app.route("/restaurant/<int:rid>/subscription/select")
+@login_or_403
+def page_subscription_info(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    subscriptions = Subscription.query.order_by(desc(Subscription.duration)).all()
+    return render_template("Subscriptions/show.htm", subscriptions=subscriptions, rid=rid, user=user)
+
+
 # Socket definitions go below
 
 @socketio.on('connectPersonnel')
@@ -1025,18 +1102,33 @@ def orderHandler(json):
     if 'tid' not in session or not Table.query.filter_by(tid=session['tid'], restaurantId=session['rid'],
                                                          token=session['token']).first():
         abort(403)
+    orderlist = {}
+    counter = 0
     data = json['json']
-    data.pop('-1')
-    for elem in data.keys():
-        if not elem == '-1':
-            newOrder = Order(restaurantId=session['rid'], tableId=session['tid'], plateId=elem,
-                             quantity=data[elem]['qty'])
-            db.session.add(newOrder)
-            db.session.commit()
-            data[elem]['oid'] = newOrder.oid
-            data[elem]['tid'] = session['tid']
-    db.session.commit()
-    emit('newOrder', data, room=session['rid'], json=True)
+    for element in data.keys():
+        if data[element]['pid'] == '-1':
+            continue
+        isCustom = False
+        if data[element]['pid'][0] == "!":
+            res = data[element]['pid'].split("!")
+            orderlist[counter] = data[element]
+            orderlist[counter]['pid'] = res[2]
+            orderlist[counter]['isCustom'] = True
+        else:
+            orderlist[counter] = data[element]
+            orderlist[counter]['isCustom'] = False
+        counter+=1
+    for order in orderlist.keys():
+        newOrder = Order(restaurantId=session['rid'], tableId=session['tid'], plateId=orderlist[order]['pid'],
+                         quantity=orderlist[order]['data']['qty'])
+        if orderlist[order]['isCustom']:
+            newOrder.specialReq = "TBD"
+        db.session.add(newOrder)
+        db.session.commit()
+        orderlist[order]['data']['oid'] = newOrder.oid
+        orderlist[order]['data']['tid'] = session['tid']
+        db.session.commit()
+    emit('newOrder', orderlist, room=session['rid'], json=True)
     print("finish")
 
 
@@ -1135,6 +1227,15 @@ def add_months(sourcedate, months):
 @app.route("/cancelled")
 def cancelled():
     return render_template("Subscriptions/result.htm", user=user, mode="fail")
+
+
+#Admin pages
+
+@app.route("/admin/add", methods=['POST'])
+@admin_or_403
+def page_admin_add():
+    pass
+
 
 
 if __name__ == "__main__":

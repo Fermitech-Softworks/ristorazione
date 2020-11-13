@@ -24,22 +24,22 @@
                     let nextButton = document.createElement("a");
                     let nextIcon = document.createElement("i");
                     let row = document.createElement("tr");
-                    row.id = "order-" + json[value]['oid'];
+                    row.id = "order-" + json[value]['data']['oid'];
                     newTab.appendChild(row);
                     let tableId = document.createElement("td");
-                    tableId.innerText = json[value]['tid']+1;
+                    tableId.innerText = json[value]['data']['tid'] + 1;
                     row.appendChild(tableId);
                     let plateName = document.createElement("td")
-                    plateName.innerText = json[value]['name'];
+                    plateName.innerText = json[value]['data']['name'];
                     row.appendChild(plateName);
                     let qty = document.createElement("td")
-                    qty.innerText = json[value]['qty'];
+                    qty.innerText = json[value]['data']['qty'];
                     row.appendChild(qty);
                     let action = document.createElement("td");
-                    action.id = "action-" + json[value]['oid'];
+                    action.id = "action-" + json[value]['data']['oid'];
                     row.appendChild(action);
                     nextButton.href = "#!"
-                    nextButton.setAttribute('onclick', 'change(' + json[value]['oid'] + ', \'tbd\', \'new\')')
+                    nextButton.setAttribute('onclick', 'change(' + json[value]['data']['oid'] + ', \'tbd\', \'new\')')
                     nextIcon.className = "material-icons";
                     nextIcon.textContent = "arrow_drop_down";
                     nextButton.appendChild(nextIcon);
@@ -123,7 +123,18 @@
                             newLi.className = "collection-item";
                             refUl.appendChild(newLi)
                             let internalDiv = document.createElement("div");
-                            internalDiv.innerText = o['name'] + " x" + o['qty'] + ", for each " + o['cost'] + "€.";
+                            internalDiv.innerText = o['name'];
+                            internalDiv.id = "order"+o['oid'];
+                            internalDiv.innerText = internalDiv.innerText + " x" + o['qty'] + ", for each " + o['cost'] + "€.";
+                            if (o['custom'] === "true") {
+                                internalDiv.innerText = internalDiv.innerText + "{{ gettext("(custom)") }}";
+                                let details = document.createElement("a");
+                                details.className = "secondary-content";
+                                details.href = "#"
+                                details.text = "{{ gettext("Edit") }}"
+                                details.setAttribute("onclick", "prepareModalSpecial(" + o['oid'] + "," + o['rid'] + ")")
+                                internalDiv.appendChild(details)
+                            }
                             newLi.appendChild(internalDiv);
                         }
                     }
@@ -170,6 +181,64 @@
             socket.emit('updateOrderStatus', json)
         }
 
+        function prepareModalSpecial(oid, rid) {
+            let xhr = new XMLHttpRequest();
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        let response = JSON.parse(xhr.responseText);
+                        console.log(response)
+                        let refdiv = document.getElementById("order"+oid);
+                        let maindiv;
+                        try{
+                            maindiv = document.getElementById("customDiv"+oid);
+                            maindiv.innerText=""
+                        }
+                        catch (error) {
+                            maindiv = document.createElement("div");
+                            maindiv.id = "customDiv" + oid;
+                            refdiv.appendChild(maindiv)
+                        }
+                        let text = document.createElement("textarea");
+                        text.value=response['override']['desc']
+                        text.id = "orderCustom"+oid;
+                        maindiv.appendChild(text);
+                        let cost = document.createElement("input");
+                        cost.id = "orderCustomCost"+oid;
+                        cost.value = response['override']['cost'];
+                        let button = document.createElement("a");
+                        button.href="#"
+                        button.setAttribute("onclick", "sendCustomData("+oid+","+rid+")")
+                        button.text = "{{ gettext("Update") }}"
+                        button.className = "waves-effect waves-light btn"
+                        maindiv.appendChild(cost)
+                        maindiv.appendChild(button)
+                    }
+                }
+            });
+            xhr.open("POST", "/order/" + oid + "/getPlate", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            let parametri = "rid=" + rid
+            xhr.send(parametri);
+        }
+
+        function sendCustomData(oid, rid){
+            let xhr = new XMLHttpRequest();
+            xhr.addEventListener("readystatechange", function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+
+                    }
+                }
+            });
+            let textBox = document.getElementById("orderCustom"+oid)
+            let costBox = document.getElementById("orderCustomCost"+oid)
+            xhr.open("POST", "/order/"+oid+"/setCustom", true)
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            let parametri = "rid="+rid+"&costOverride="+costBox.value+"&special="+textBox.value;
+            xhr.send(parametri);
+        }
+
     </script>
 {% endblock %}
 {% block content %}
@@ -185,6 +254,30 @@
                                onclick="prepareModal({{ table.tid }}, {{ table.restaurantId }})"><i
                                     class="material-icons">search</i>
                             </a>
+                        </div>
+                        <div id="modal{{ table.tid }}" class="modal">
+                            <div class="modal-content">
+                                <h4>{{ gettext("Table number") }} {{ table.tid + 1 }}</h4>
+                                <div class="row">
+                                    <div class="col s12 m6">
+                                        <p>{{ gettext("The current token is ") }}</p>
+                                        <div id="token{{ table.tid }}"></div>
+                                        <a href="#" onclick="closeTable({{ table.tid }}, {{ table.restaurantId }})"
+                                           class="waves-effect waves-light btn">Sign-off table</a>
+                                    </div>
+                                    <div class="col s12 m6">
+                                        <p>{{ gettext("List of orders. ") }}<a href="#"
+                                                                               onclick="getOrders({{ table.tid }}, {{ table.restaurantId }})">{{ gettext("Click here to refresh.") }}</a>
+                                        </p>
+                                        <ul class="collection" id="orders{{ table.tid }}">
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <a href="#!"
+                                   class="modal-close waves-effect waves-green btn-flat">{{ gettext("Close") }}</a>
+                            </div>
                         </div>
                         <div id="modal{{ table.tid }}" class="modal">
                             <div class="modal-content">
@@ -231,8 +324,9 @@
                             <tbody id="new">
                             {% for order in op %}
                                 <tr id="order-{{ order.oid }}">
-                                    <td>{{ order.tableId + 1}}</td>
-                                    <td>{{ order.plate.name }}</td>
+                                    <td>{{ order.tableId + 1 }}</td>
+                                    <td>{{ order.plate.name }} {% if order.specialReq is not none %}
+                                        {{ gettext("(custom)") }} {% endif %}</td>
                                     <td>{{ order.quantity }}</td>
                                     <td id="action-{{ order.oid }}"><a href="#!"
                                                                        onclick="change({{ order.oid }}, 'tbd', 'new')"><i
@@ -259,13 +353,14 @@
                             <tbody id="tbd">
                             {% for order in ot %}
                                 <tr id="order-{{ order.oid }}">
-                                    <td>{{ order.tableId }}</td>
-                                    <td>{{ order.plate.name }}</td>
+                                    <td>{{ order.tableId + 1 }}</td>
+                                    <td>{{ order.plate.name }} {% if order.specialReq is not none %}
+                                        {{ gettext("(custom)") }} {% endif %}</td>
                                     <td>{{ order.quantity }}</td>
                                     <td id="action-{{ order.oid }}"><a href="#!"
-                                                                       onclick="change({{ order.oid }}, 2, 'delivered', 'tbd')"><i
+                                                                       onclick="change({{ order.oid }}, 'delivered', 'tbd')"><i
                                             class="material-icons">arrow_drop_down</i></a>
-                                        <a href="#!" onclick="change({{ order.oid }}, 0, 'new', 'tbd')"><i
+                                        <a href="#!" onclick="change({{ order.oid }}, 'new', 'tbd')"><i
                                                 class="material-icons">arrow_drop_up</i></a>
                                     </td>
                                 </tr>
@@ -289,11 +384,12 @@
                             <tbody id="delivered">
                             {% for order in oc %}
                                 <tr id="order-{{ order.oid }}">
-                                    <td>{{ order.tableId }}</td>
-                                    <td>{{ order.plate.name }}</td>
+                                    <td>{{ order.tableId + 1 }}</td>
+                                    <td>{{ order.plate.name }} {% if order.specialReq is not none %}
+                                        {{ gettext("(custom)") }} {% endif %}</td>
                                     <td>{{ order.quantity }}</td>
                                     <td id="action-{{ order.oid }}"><a href="#!"
-                                                                       onclick="change({{ order.oid }}, 1, 'tbd', 'delivered')"><i
+                                                                       onclick="change({{ order.oid }}, 'tbd', 'delivered')"><i
                                             class="material-icons">arrow_drop_up</i></a>
                                     </td>
                                 </tr>
@@ -305,5 +401,4 @@
             </ul>
         </div>
     </div>
-
 {% endblock %}

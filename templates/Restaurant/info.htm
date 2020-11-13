@@ -1,5 +1,77 @@
 {% extends "stampo.htm" %}
 {% block title %}{{ restaurant.name }}{% endblock %}
+{% block extrahead %}
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/css/ol.css"
+          type="text/css">
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.4.3/build/ol.js"></script>
+    <style>
+        .map {
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+    <script>
+        function gatherLocation() {
+            const state = "{{ state }}";
+            const address = "{{ address }}";
+            const city = "{{ city }}";
+            console.log(address)
+            console.log("https://nominatim.openstreetmap.org/search?q=" + address.replace(/\s/g, '+') + "," + city.replace(/\s/g, '+') + "," + state.replace(/\s/g, '+') + "&format=json&polygon=1&addressdetails=1")
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", "https://nominatim.openstreetmap.org/search?q=" + address.replace(/\s/g, '+') + "," + city.replace(/\s/g, '+') + "," + state.replace(/\s/g, '+') + "&format=json&polygon=1&addressdetails=1", true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+            xhr.addEventListener("readystatechange", function () {
+                var map = document.getElementById("map");
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try{
+                        response = JSON.parse(xhr.response)
+                        mapSetup(response[0]['lat'], response[0]['lon'])}
+                        catch(e){
+                            map.remove()
+                        }
+                    } else {
+                        map.remove()
+                    }
+                }
+            });
+            xhr.send()
+        }
+
+        function mapSetup(lat, lon) {
+            var map = new ol.Map({
+                target: 'map',
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.OSM()
+                    })
+                ],
+                view: new ol.View({
+                    center: ol.proj.fromLonLat([lon, lat]),
+                    zoom: 16
+                })
+            })
+            const center = map.getView().getCenter();
+            const pinnedLocation = ol.proj.transform(center, 'EPSG:3857', 'EPSG:4326');
+            const feature = new ol.Feature(new ol.geom.Point(center));
+            const pinLayer = new ol.layer.Vector({
+                source: new ol.source.Vector({
+                    features: [feature]
+                }),
+                style: new ol.style.Style({
+                    image: new ol.style.Icon({
+                        src: "{{ url_for('static', filename='pin.png') }}"
+                    })
+                })
+            });
+            map.addLayer(pinLayer);
+        }
+
+        gatherLocation()
+    </script>
+{% endblock %}
 {% block content %}
     <div class="row">
         <div class="default-jumbotron">
@@ -11,8 +83,8 @@
         <div class="row">
             <div class="col s12 m8">
                 {% if restaurant.link is defined %}
-                <img class="responsive-img"
-                     src="{{ restaurant.link }}">
+                    <img class="responsive-img"
+                         src="{{ restaurant.link }}">
                 {% endif %}
                 <br>
                 <div class="row">
@@ -30,11 +102,11 @@
                                     </div>
                                 </div>
                                 <div class="row">
-                                    <div class = "col s12">
-                                    <button class="btn waves-effect waves-light" type="submit"
-                                            name="action">{{ gettext("Sit down") }}
-                                        <i class="material-icons right">send</i>
-                                    </button>
+                                    <div class="col s12">
+                                        <button class="btn waves-effect waves-light" type="submit"
+                                                name="action">{{ gettext("Sit down") }}
+                                            <i class="material-icons right">send</i>
+                                        </button>
                                     </div>
                                 </div>
                             </form>
@@ -56,6 +128,8 @@
                 </div>
             </div>
             <div class="col s12 m4">
+                <div id="map" class="map"></div>
+                <br>
                 <div class="outlined-jumbotron">
                     <h5>{{ gettext("About this restaurant:") }}</h5>
                     <p class="flow-text" style="font-size: 90%"> {{ restaurant.description }} </p>
@@ -73,4 +147,5 @@
                 </div>
             </div>
         </div>
+    </div>
 {% endblock %}

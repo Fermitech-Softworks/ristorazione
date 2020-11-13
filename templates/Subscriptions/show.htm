@@ -1,0 +1,6 @@
+{% extends "stampo.htm" %}
+{% block title %} {{ gettext("Subscription plans") }} {% endblock %}
+{% block content %}
+    <h3>{{ gettext("These are the subscription plans currently available.") }}</h3>
+    {% include "Subscriptions/grid.htm" %}
+{% endblock %}

@@ -140,14 +140,14 @@
                             dishLi.appendChild(linkDiv);
                             var addLink = document.createElement("a");
                             addLink.href = "#";
-                            addLink.setAttribute("onclick", 'add(' + dish['pid'] + ',' + '\'' + dish['name'] + '\'' + ')');
+                            addLink.setAttribute("onclick", 'add(' + dish['pid'] + ',' + '\'' + dish['name'] + '\'' + ', false )');
                             addLink.textContent = "Add";
                             linkDiv.appendChild(addLink);
-                            var remLink = document.createElement("a");
-                            remLink.href = "#";
-                            remLink.setAttribute("onclick", 'remove(' + dish['pid'] + ')');
-                            remLink.textContent = " Remove";
-                            linkDiv.appendChild(remLink);
+                            var addSLink = document.createElement("a");
+                            addSLink.href = "#";
+                            addSLink.setAttribute("onclick", 'add(' + dish['pid'] + ',' + '\'' + dish['name'] + '\'' + ', true )');
+                            addSLink.textContent = "Add as Special";
+                            linkDiv.appendChild(addSLink);
                         }
 
                     } else {
@@ -161,8 +161,13 @@
         }
 
         var orders = {'-1': -1};
+        var customCounter = 0;
 
-        function add(pid, name) {
+        function add(pid, name, mode) {
+            if (mode) {
+                pid = "!" + customCounter + "!" + pid;
+                customCounter++;
+            }
             if (orders[pid]) {
                 orders[pid]['qty'] += 1;
                 console.log(orders[pid])
@@ -170,6 +175,9 @@
                 orders[pid] = {}
                 orders[pid]['qty'] = 1;
                 orders[pid]['name'] = name
+                if (mode) {
+                    orders[pid]['name'] = orders[pid]['name'] + " (custom)";
+                }
             }
             updater();
         }
@@ -192,11 +200,17 @@
             masterUl.className = "collection";
             refDiv.appendChild(masterUl);
             Object.entries(orders).forEach(([key, value]) => {
-                if (key >= 0) {
+                if (key !== "-1") {
                     li = document.createElement("li");
                     li.className = "collection-item";
                     li.textContent = value['name'] + " x" + value['qty'];
                     masterUl.appendChild(li);
+                    var remLink = document.createElement("a");
+                    remLink.className = "secondary-content";
+                    remLink.href = "#";
+                    remLink.setAttribute("onclick", 'remove(\'' + key + '\')');
+                    remLink.textContent = "X";
+                    li.appendChild(remLink);
                 }
             });
         }
@@ -206,7 +220,11 @@
             console.log('ping1')
             button = document.getElementById("subButton");
             button.setAttribute("onclick", "return false;")
-            socket.emit('newOrder', {json: orders})
+            var list = {}
+            for(var key in orders) {
+                list[key] = {pid: key, data: orders[key]}
+            }
+            socket.emit('newOrder', {json: list})
             sleep(1000);
             window.location = '{{url_for('page_orders_dashboard', rid=rid)}}';
         }

@@ -1,0 +1,22 @@
+{% for sub_row in subscriptions | batch(3, '&nbsp;') %}
+    <div class="row">
+        {% for subscription in sub_row %}
+            {% if subscription.name %}
+                <div class="col s4">
+                    <div class="card" , style="background: #ff6f00; color: #fafafa">
+                        <div class="card-content white-text">
+                            <span class="card-title">{{ subscription.name }}</span>
+                            <p>{{ subscription.description }}</p>
+                        </div>
+                        {% if rid is defined %}
+                            <div class="card-action">
+                                <a href="/restaurant/{{ rid }}/subscribe/{{ subscription.sid }}" style="color: #fafafa">Add
+                                    to your restaurant</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+{% endfor %}

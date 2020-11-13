@@ -9,15 +9,37 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script>
+        $(document).ready(function cookies() {
+            let auth = localStorage.getItem('cookie-auth')
+            if (auth == null) {
+                $('.modal').modal();
+                var instance = M.Modal.getInstance(document.getElementById("modalCookie"));
+                instance.open()
+            }
+        });
+        function acceptCookie(){
+            localStorage.setItem('cookie-auth', 'yes');
+        }
+    </script>
     {% block extrahead %}
     {% endblock %}
 </head>
 <body {% if invert is defined %}style="background-color: #ff6f00"{% endif %}>
 {% if hidebar is not defined %}
-{% include 'nav.htm' %}
+    {% include 'nav.htm' %}
 {% endif %}
 <br>
 <div class="container">
+    <div id="modalCookie" class="modal">
+        <div class="modal-content">
+            <h4>{{ gettext("Welcome,") }}</h4>
+            <p class="flow-text">{{ gettext("In order to provide its services, Ristorazione uses cookies. To learn more about our cookie policy, please read" )}}<a href="">{{ gettext(" our cookie policy")}}</a>.</p>
+        </div>
+        <div class="modal-footer">
+            <a href="#!" class="modal-close waves-effect waves-green btn-flat" onclick="acceptCookie()">{{ gettext("Agree") }}</a>
+        </div>
+    </div>
     {% block content %}{% endblock %}
 </div>
 </body>

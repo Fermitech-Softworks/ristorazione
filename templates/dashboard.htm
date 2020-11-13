@@ -91,7 +91,8 @@
                                         <label for="name">Name</label>
                                     </div>
                                     <div class="input-field col s3">
-                                        <input id="surname" type="text" class="validate" name="surname" value={{ user.surname }}>
+                                        <input id="surname" type="text" class="validate" name="surname"
+                                               value={{ user.surname }}>
                                         <label for="surname">Surname</label>
                                     </div>
                                     <div class="input-field col s3">
@@ -107,7 +108,8 @@
                                 </div>
                             </form>
                         </div>
-                        <p>{{ gettext("If you want to delete your account, ") }} <a href="/delete/0/{{user.email}}/user/0">{{ gettext("click here") }}</a>.</p>
+                        <p>{{ gettext("If you want to delete your account, ") }} <a
+                                href="/delete/0/{{ user.email }}/user/0">{{ gettext("click here") }}</a>.</p>
                     </div>
                 </div>
             </div>
