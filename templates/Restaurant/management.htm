@@ -194,6 +194,39 @@
                     <ul class="collapsible">
                         <li>
                             <div class="collapsible-header"><i
+                                    class="material-icons">local_pizza</i>{{ gettext("Ingredients") }}</div>
+                            <div class="collapsible-body">
+                                <a href="/restaurant/{{ data.rid }}/ingredient/add" class="btn waves-effect waves-light"
+                                   type="submit"
+                                   name="action">{{ gettext("Create new ingredient") }}
+                                    <i class="material-icons right">local_pizza</i>
+                                </a>
+                                <table>
+                                    <thead>
+                                    <tr>
+                                        <th>{{ gettext("Name") }}</th>
+                                        <th>{{ gettext("Price") }}</th>
+                                        <th>{{ gettext("Actions") }}</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="dishesTableBody">
+                                    {% for ingredient in data.ownedIngredients %}
+                                        <tr>
+                                            <td>{{ ingredient.name }}</td>
+                                            <td>{{ ingredient.addCost }} €</td>
+                                            <td>
+                                                <a href="/plate/edit/{{ ingredient.iid }}/{{ ingredient.restaurant_id }}"><i
+                                                        class="material-icons">create</i></a> <a
+                                                    href="/restaurant/{{ data.rid }}/plate/{{ ingredient.iid }}/delete"><i
+                                                    class="material-icons">delete</i></a></td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="collapsible-header"><i
                                     class="material-icons">local_pizza</i>{{ gettext("Plates") }}</div>
                             <div class="collapsible-body">
                                 <a href="/restaurant/{{ data.rid }}/dish/add" class="btn waves-effect waves-light"
@@ -263,7 +296,8 @@
                         <a href="/delete/{{ data.rid }}/{{ data.rid }}/restaurant/0">{{ gettext("click here.") }}</a>
                     </p>
                     <hr>
-                    <a href="/restaurant/{{ data.rid }}/subscription/select" class="btn waves-effect waves-light">{{ gettext("Browse the subscription plans") }}</a>
+                    <a href="/restaurant/{{ data.rid }}/subscription/select"
+                       class="btn waves-effect waves-light">{{ gettext("Browse the subscription plans") }}</a>
                     <table>
                         <thead>
                         <tr>

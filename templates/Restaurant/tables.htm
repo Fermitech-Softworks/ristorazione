@@ -125,6 +125,7 @@
                         let response = JSON.parse(xhr.responseText);
                         for (const o of response['orders']) {
                             let newLi = document.createElement("li")
+                            newLi.id = "orderLi"+o['oid']
                             newLi.className = "collection-item";
                             refUl.appendChild(newLi)
                             let internalDiv = document.createElement("div");
@@ -136,7 +137,8 @@
                                 let details = document.createElement("a");
                                 details.className = "secondary-content";
                                 details.href = "#"
-                                details.text = "{{ gettext("Edit") }}"
+                                details.text = "{{ gettext("Details") }}"
+                                details.id = "orderDetails"+o['oid']
                                 details.setAttribute("onclick", "prepareModalSpecial(" + o['oid'] + "," + o['rid'] + ")")
                                 internalDiv.appendChild(details)
                             }
@@ -199,6 +201,8 @@
                         let response = JSON.parse(xhr.responseText);
                         console.log(response)
                         let refdiv = document.getElementById("order" + oid);
+                        let li = document.getElementById("orderLi" + oid);
+                        let button = document.getElementById("orderDetails"+oid)
                         let maindiv;
                         try {
                             maindiv = document.getElementById("customDiv" + oid);
@@ -208,20 +212,16 @@
                             maindiv.id = "customDiv" + oid;
                             refdiv.appendChild(maindiv)
                         }
-                        let text = document.createElement("textarea");
-                        text.value = response['override']['desc']
-                        text.id = "orderCustom" + oid;
-                        maindiv.appendChild(text);
-                        let cost = document.createElement("input");
-                        cost.id = "orderCustomCost" + oid;
-                        cost.value = response['override']['cost'];
-                        let button = document.createElement("a");
-                        button.href = "#"
-                        button.setAttribute("onclick", "sendCustomData(" + oid + "," + rid + ")")
-                        button.text = "{{ gettext("Update") }}"
-                        button.className = "waves-effect waves-light btn"
-                        maindiv.appendChild(cost)
-                        maindiv.appendChild(button)
+                        for(const [key, value] of Object.entries(response['override']['desc'])){
+                            let p = document.createElement("p")
+                            let status = " +"
+                            if(value['mode']===false){
+                                status = " -"
+                            }
+                            p.textContent = status +" "+ value['ingredient']['name'] + "("+value['ingredient']['addCost']+"€)";
+                            li.appendChild(p);
+                        }
+                        button.remove()
                     } else {
                         M.toast({html: '{{ gettext("Something went wrong while loading order details.") }}'})
                     }
@@ -338,7 +338,7 @@
                             {% for order in op %}
                                 <tr id="order-{{ order.oid }}">
                                     <td>{{ order.tableId + 1 }}</td>
-                                    <td>{{ order.plate.name }} {% if order.specialReq is not none %}
+                                    <td>{{ order.plate.name }} {% if order.costOverride is not none %}
                                         {{ gettext("(custom)") }} {% endif %}</td>
                                     <td>{{ order.quantity }}</td>
                                     <td id="action-{{ order.oid }}"><a href="#!"
@@ -367,7 +367,7 @@
                             {% for order in ot %}
                                 <tr id="order-{{ order.oid }}">
                                     <td>{{ order.tableId + 1 }}</td>
-                                    <td>{{ order.plate.name }} {% if order.specialReq is not none %}
+                                    <td>{{ order.plate.name }} {% if order.costOverride is not none %}
                                         {{ gettext("(custom)") }} {% endif %}</td>
                                     <td>{{ order.quantity }}</td>
                                     <td id="action-{{ order.oid }}"><a href="#!"
@@ -398,7 +398,7 @@
                             {% for order in oc %}
                                 <tr id="order-{{ order.oid }}">
                                     <td>{{ order.tableId + 1 }}</td>
-                                    <td>{{ order.plate.name }} {% if order.specialReq is not none %}
+                                    <td>{{ order.plate.name }} {% if order.costOverride is not none %}
                                         {{ gettext("(custom)") }} {% endif %}</td>
                                     <td>{{ order.quantity }}</td>
                                     <td id="action-{{ order.oid }}"><a href="#!"
