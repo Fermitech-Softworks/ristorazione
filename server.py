@@ -68,6 +68,7 @@ class Restaurant(db.Model):
     work = db.relationship("Work", back_populates="restaurant", cascade="all, delete")
     menus = db.relationship("MenuAssociation", back_populates="restaurant", cascade="all, delete")
     ownedPlates = db.relationship("Plate", back_populates="restaurant", cascade="all, delete")
+    ownedIngredients = db.relationship("Ingredient", back_populates="restaurant", cascade="all, delete")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant", cascade="all, delete")
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant", cascade="all, delete")
@@ -148,17 +149,46 @@ class Plate(db.Model):
     pid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
-    ingredients = db.Column(db.String)
+    ingredients = db.relationship("Composition", back_populates="plate", cascade="all, delete")
+    additions = db.relationship("Additions", back_populates="plate", cascade="all, delete")
     cost = db.Column(db.Float, nullable=False)
     link = db.Column(db.String)
     categories = db.relationship("CategoryAssociation", back_populates="plate", cascade="all, delete")
     order = db.relationship("Order", back_populates="plate", cascade="all, delete")
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="ownedPlates")
+    ifRemovedIngredientsDecreasePrice = db.Column(db.Boolean, default=True)
 
     def toJson(self):
         return {'pid': self.pid, 'name': self.name, 'description': self.description, 'ingredients': self.ingredients,
                 'cost': self.cost, 'link': self.link}
+
+
+class Composition(db.Model):
+    __tablename__ = "composition"
+    iid = db.Column(db.Integer, db.ForeignKey('ingredient.iid'), primary_key=True)
+    pid = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    ingredient = db.relationship("Ingredient", back_populates="plates")
+    plate = db.relationship("Plate", back_populates="ingredients")
+
+
+class Additions(db.Model):
+    __tablename__ = "additions"
+    iid = db.Column(db.Integer, db.ForeignKey('ingredient.iid'), primary_key=True)
+    pid = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    ingredient = db.relationship("Ingredient", back_populates="compatible")
+    plate = db.relationship("Plate", back_populates="additions")
+
+
+class Ingredient(db.Model):
+    __tablename__ = "ingredient"
+    iid = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    addCost = db.Column(db.Float)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
+    restaurant = db.relationship("Restaurant", back_populates="ownedIngredients", cascade="all, delete")
+    compatible = db.relationship("Additions", back_populates="ingredient", cascade="all, delete")
+    plates = db.relationship("Composition", back_populates="ingredient")
 
 
 class CategoryAssociation(db.Model):
