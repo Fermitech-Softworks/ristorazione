@@ -13,6 +13,45 @@
             divIndet.className = "indeterminate";
             divUpper.appendChild(divIndet);
         }
+
+        let ingredients = 0;
+        let additions = 0;
+
+        function genhtml(n, mode) {
+            return "<select id=\"" + mode + n + "\" class=\"browser-default\" name=\"" + mode + n + "\">{% for ingredient in ingredients %}<option value=\"{{ingredient.iid}}\">{{ingredient.name}}</option>{% endfor %}</select>"
+        }
+
+        function add(mode) {
+            if (mode === "composition") {
+                $("#composition").append(genhtml(ingredients, mode));
+                ingredients += 1;
+                $("#composition-removed").removeClass("disabled");
+            } else {
+                $("#addition").append(genhtml(additions, "addition"));
+                additions += 1;
+                $("#addition-removed").removeClass("disabled");
+            }
+        }
+
+        function remove(mode) {
+            if (mode === "composition") {
+                if (ingredients > 0) {
+                    $("#composition" + (ingredients - 1)).remove();
+                    ingredients -= 1;
+                    if (ingredients === 0) {
+                        $("#composition-removed").addClass("disabled");
+                    }
+                }
+            } else {
+                if (additions > 0) {
+                    $("#addition" + (additions - 1)).remove();
+                    additions -= 1;
+                    if (additions === 0) {
+                        $("#addition-removed").addClass("disabled");
+                    }
+                }
+            }
+        }
     </script>
 {% endblock %}
 {% block content %}
@@ -40,10 +79,26 @@
                     </div>
                 </div>
                 <div class="row">
-                    <div class="input-field col s12">
-                        <input id="name" type="text" class="validate" name="ingredients" {% if plate is defined %}
-                               value="{{ plate.ingredients }}" {% endif %}>
-                        <label for="name">{{ gettext("Ingredients") }}</label>
+                    <div class="input-field col s6">
+                        {{ gettext("Ingredients") }}
+                        <div id="composition">
+                            <p>
+                            <div id="add-ingredient" class="btn waves-effect waves-light"
+                                 onclick="add('composition')"><i class="material-icons">add</i></div>
+                            <div id="remove-ingredient" class="btn waves-effect waves-light"
+                                 onclick="remove('composition')"><i class="material-icons">remove</i></div>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="input-field col s6">
+                        {{ gettext("Allowed Additions") }}
+                        <div id="addition">
+                            <p>
+                            <div id="add-addition" class="btn waves-effect waves-light" onclick="add('addition')"><i class="material-icons">add</i></div>
+                            <div id="remove-addition" class="btn waves-effect waves-light"
+                                 onclick="remove('addition')"><i class="material-icons">remove</i></div>
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <div class="row">

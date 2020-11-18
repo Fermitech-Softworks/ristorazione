@@ -131,7 +131,11 @@
                             dishName.className = "title";
                             dishLi.appendChild(dishName);
                             var dishDesc = document.createElement("p");
-                            dishDesc.textContent = dish['description']+", "+dish['ingredients']+". "+dish['cost']+"€";
+                            let description = ""
+                            for(const ingredient of dish['ingredients']){
+                                description=description+ingredient['name']+", "
+                            }
+                            dishDesc.textContent = dish['description'] + ". " + description + dish['cost'] + "€";
                             dishLi.appendChild(dishDesc);
                         }
 

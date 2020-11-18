@@ -43,6 +43,7 @@ base_url = os.getenv('baseUrl')
 reverse_proxy_app = werkzeug.middleware.proxy_fix.ProxyFix(app=app, x_for=1, x_proto=0, x_host=1, x_port=0, x_prefix=0)
 paymentSessions = []
 
+
 # DB classes go beyond this point
 
 
@@ -68,6 +69,7 @@ class Restaurant(db.Model):
     work = db.relationship("Work", back_populates="restaurant", cascade="all, delete")
     menus = db.relationship("MenuAssociation", back_populates="restaurant", cascade="all, delete")
     ownedPlates = db.relationship("Plate", back_populates="restaurant", cascade="all, delete")
+    ownedIngredients = db.relationship("Ingredient", back_populates="restaurant", cascade="all, delete")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant", cascade="all, delete")
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant", cascade="all, delete")
@@ -148,17 +150,57 @@ class Plate(db.Model):
     pid = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False)
     description = db.Column(db.String)
-    ingredients = db.Column(db.String)
+    ingredients = db.relationship("Composition", back_populates="plate", cascade="all, delete")
+    additions = db.relationship("Additions", back_populates="plate", cascade="all, delete")
     cost = db.Column(db.Float, nullable=False)
     link = db.Column(db.String)
     categories = db.relationship("CategoryAssociation", back_populates="plate", cascade="all, delete")
     order = db.relationship("Order", back_populates="plate", cascade="all, delete")
     restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="ownedPlates")
+    ifRemovedIngredientsDecreasePrice = db.Column(db.Boolean, default=True)
 
     def toJson(self):
-        return {'pid': self.pid, 'name': self.name, 'description': self.description, 'ingredients': self.ingredients,
+        return {'pid': self.pid, 'name': self.name, 'description': self.description,
+                'ingredients': [i.toJson() for i in self.ingredients], 'additions': [a.toJson() for a in self.additions],
                 'cost': self.cost, 'link': self.link}
+
+
+class Composition(db.Model):
+    __tablename__ = "composition"
+    iid = db.Column(db.Integer, db.ForeignKey('ingredient.iid'), primary_key=True)
+    pid = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    ingredient = db.relationship("Ingredient", back_populates="plates")
+    plate = db.relationship("Plate", back_populates="ingredients")
+
+    def toJson(self):
+        return self.ingredient.toJson()
+
+
+class Additions(db.Model):
+    __tablename__ = "additions"
+    iid = db.Column(db.Integer, db.ForeignKey('ingredient.iid'), primary_key=True)
+    pid = db.Column(db.Integer, db.ForeignKey('plate.pid'), primary_key=True)
+    ingredient = db.relationship("Ingredient", back_populates="compatible")
+    plate = db.relationship("Plate", back_populates="additions")
+
+    def toJson(self):
+        return self.ingredient.toJson()
+
+
+class Ingredient(db.Model):
+    __tablename__ = "ingredient"
+    iid = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    addCost = db.Column(db.Float)
+    restaurant_id = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
+    restaurant = db.relationship("Restaurant", back_populates="ownedIngredients", cascade="all, delete")
+    compatible = db.relationship("Additions", back_populates="ingredient", cascade="all, delete")
+    plates = db.relationship("Composition", back_populates="ingredient")
+    customizations = db.relationship("Customization", back_populates="ingredient")
+
+    def toJson(self):
+        return {'iid': self.iid, 'name': self.name, 'addCost': self.addCost}
 
 
 class CategoryAssociation(db.Model):
@@ -180,8 +222,30 @@ class Order(db.Model):
     table = db.relationship("Table", back_populates="order")
     plate = db.relationship("Plate", back_populates="order")
     restaurant = db.relationship("Restaurant", back_populates="orders")
-    specialReq = db.Column(db.String)
+    specialReq = db.relationship("Customization")
     costOverride = db.Column(db.Float)
+
+    def computeCost(self):
+        baseCost = self.plate.cost
+        for element in self.specialReq:
+            if element.mode:
+                baseCost+=element.ingredient.addCost
+            elif self.plate.ifRemovedIngredientsDecreasePrice:
+                baseCost-=element.ingredient.addCost
+        if baseCost != self.plate.cost:
+            self.costOverride = baseCost
+
+
+class Customization(db.Model):
+    __tablename__ = "customization"
+    oid = db.Column(db.Integer, db.ForeignKey("order.oid"), primary_key=True)
+    iid = db.Column(db.Integer, db.ForeignKey("ingredient.iid"), primary_key=True)
+    mode = db.Column(db.Boolean, nullable=False)
+    order = db.relationship("Order", back_populates="specialReq")
+    ingredient = db.relationship("Ingredient", back_populates="customizations")
+
+    def toJson(self):
+        return {'mode': self.mode, 'ingredient':self.ingredient.toJson()}
 
 
 class Transaction(db.Model):
@@ -478,7 +542,8 @@ def page_restaurant_edit(rid):
 @app.route("/restaurant/<int:rid>/info", methods=['GET', 'POST'])
 def page_restaurant_info(rid):
     restaurant = Restaurant.query.get_or_404(rid)
-    return render_template("Restaurant/info.htm", restaurant=restaurant, address=urllib.parse.quote(restaurant.address), state=urllib.parse.quote(restaurant.state), city=urllib.parse.quote(restaurant.city))
+    return render_template("Restaurant/info.htm", restaurant=restaurant, address=urllib.parse.quote(restaurant.address),
+                           state=urllib.parse.quote(restaurant.state), city=urllib.parse.quote(restaurant.city))
 
 
 @app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
@@ -651,11 +716,15 @@ def page_dish_add(rid):
         abort(403)
         return
     if request.method == "GET":
-        return render_template("Menu/Plate/addOrMod.htm", user=user, rid=rid)
+        ingredients = Ingredient.query.filter_by(restaurant_id=rid).order_by(Ingredient.name.asc()).all()
+        return render_template("Menu/Plate/addOrMod.htm", user=user, rid=rid, ingredients=ingredients)
     name = request.form.get('name')
     description = request.form.get('description')
     ingredients = request.form.get('ingredients')
     cost = float(request.form.get('cost'))
+    ingredients = list()
+    additions = list()
+
     url = None
     if 'file' in request.files:
         file = request.files['file']
@@ -673,7 +742,23 @@ def page_dish_add(rid):
     newDish = Plate(name=name, description=description, ingredients=ingredients, cost=cost, restaurant_id=rid, link=url)
     db.session.add(newDish)
     db.session.commit()
-    print(rid)
+    while True:
+        ingstring = 'composition{}'.format(len(ingredients))
+        if ingstring in request.form:
+            ingredients.append(request.form[ingstring])
+        else:
+            break
+    while True:
+        addstring = 'addition{}'.format(len(additions))
+        if addstring in request.form:
+            additions.append(request.form[addstring])
+        else:
+            break
+    for ing in ingredients:
+        db.session.add(Composition(iid=ing, pid=newDish.pid))
+    for add in additions:
+        db.session.add(Additions(iid=add, pid=newDish.pid))
+    db.session.commit()
     return redirect(url_for("page_restaurant_management", rid=rid))
 
 
@@ -726,6 +811,41 @@ def page_dish_edit(pid, rid):
     return redirect(url_for("page_restaurant_management", rid=rid))
 
 
+@app.route("/restaurant/<int:rid>/ingredient/add", methods=['GET', 'POST'])
+@login_or_403
+def page_ingredient_add(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    if request.method == "GET":
+        return render_template("Menu/Plate/Ingredients/addOrMod.htm", user=user, rid=rid)
+    name = request.form.get('name')
+    cost = float(request.form.get('addCost'))
+    newIngredient = Ingredient(name=name, addCost=cost, restaurant_id=rid)
+    db.session.add(newIngredient)
+    db.session.commit()
+    return redirect(url_for("page_restaurant_management", rid=rid))
+
+
+@app.route("/ingredient/edit/<int:iid>/<int:rid>", methods=['GET', 'POST'])
+@login_or_403
+def page_ingredient_edit(iid, rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+        return
+    ingredient = Ingredient.query.get_or_404(iid)
+    if request.method == "GET":
+        return render_template("Menu/Ingredient/addOrMod.htm", user=user, rid=rid, ingredient=ingredient)
+    ingredient.name = request.form.get('name')
+    ingredient.addCost = float(request.form.get('addCost'))
+    db.session.commit()
+    return redirect(url_for("page_restaurant_management", rid=rid))
+
+
 @app.route("/restaurant/<int:rid>/dish/get", methods=['POST'])
 def page_dish_get(rid):
     dishes = Plate.query.filter_by(restaurant_id=rid).all()
@@ -765,6 +885,26 @@ def page_menu_get_components(mid, cid):
         dishlist.append(dish.plate.toJson())
     response = {'response': {'categories': catlist, 'dishes': dishlist}}
     return response
+
+
+@app.route("/plate/<int:pid>/getAdditions")
+def page_plate_get_additions(pid):
+    plate = Plate.query.get_or_404(pid)
+    dict = {}
+    for a in plate.additions:
+        dict[a.iid]=a.toJson()
+    for i in plate.ingredients:
+        dict[i.iid] = i.toJson()
+    return dict
+
+
+@app.route("/plate/<int:pid>/getIngredients")
+def page_plate_get_ingredients(pid):
+    plate = Plate.query.get_or_404(pid)
+    dict = {}
+    for a in plate.ingredients:
+        dict[a.iid]=a.toJson()
+    return dict
 
 
 @app.route("/search", methods=['POST'])
@@ -825,8 +965,9 @@ def page_table_get_orders(tid):
         if order.specialReq:
             custom = "true"
             if order.costOverride:
-                cost=order.costOverride
-        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': cost, 'qty': order.quantity, 'custom': custom, 'oid':order.oid, 'rid':order.restaurantId, 'tid':tid}
+                cost = order.costOverride
+        tmp = {'pid': order.plate.pid, 'name': order.plate.name, 'cost': cost, 'qty': order.quantity, 'custom': custom,
+               'oid': order.oid, 'rid': order.restaurantId, 'tid': tid}
         response['orders'].append(tmp)
     return response
 
@@ -859,7 +1000,7 @@ def page_order_getPlate(oid):
     cost = order.costOverride
     if not order.costOverride:
         cost = order.plate.cost
-    ans['override']={'desc': order.specialReq, 'cost': cost, 'tid': order.tableId, 'oid': order.oid}
+    ans['override'] = {'desc': [i.toJson() for i in order.specialReq], 'cost': cost, 'tid': order.tableId, 'oid': order.oid}
     return ans
 
 
@@ -875,11 +1016,11 @@ def page_table_close(tid):
     response = {'orders': []}
     for order in table.order:
         if order.costOverride:
-            cost=order.costOverride
+            cost = order.costOverride
             name = order.plate.name + " - " + order.specialReq
         else:
-            cost=order.plate.cost
-            name=order.plate.name
+            cost = order.plate.cost
+            name = order.plate.name
         tmp = {'pid': order.plate.pid, 'name': name, 'cost': cost * order.quantity,
                'qty': order.quantity}
         response['orders'].append(tmp)
@@ -1108,25 +1249,31 @@ def orderHandler(json):
     for element in data.keys():
         if data[element]['pid'] == '-1':
             continue
-        isCustom = False
-        if data[element]['pid'][0] == "!":
-            res = data[element]['pid'].split("!")
+        if data[element]['special']:
             orderlist[counter] = data[element]
-            orderlist[counter]['pid'] = res[2]
+            orderlist[counter]['pid'] = data[element]['originalpid']
             orderlist[counter]['isCustom'] = True
+            orderlist[counter]['customizations'] = data[element]['customizations']
         else:
             orderlist[counter] = data[element]
             orderlist[counter]['isCustom'] = False
-        counter+=1
+        counter += 1
     for order in orderlist.keys():
         newOrder = Order(restaurantId=session['rid'], tableId=session['tid'], plateId=orderlist[order]['pid'],
                          quantity=orderlist[order]['data']['qty'])
-        if orderlist[order]['isCustom']:
-            newOrder.specialReq = "TBD"
         db.session.add(newOrder)
         db.session.commit()
+        if orderlist[order]['isCustom']:
+            for custom in orderlist[order]['customizations']:
+                mode = True
+                if orderlist[order]['customizations'][custom]['mode'] == "-":
+                    mode=False
+                #TODO: Add a way to check if the ingredient is connected to the plate.
+                newConn = Customization(oid=newOrder.oid, iid=orderlist[order]['customizations'][custom]['iid'], mode=mode)
+                db.session.add(newConn)
         orderlist[order]['data']['oid'] = newOrder.oid
         orderlist[order]['data']['tid'] = session['tid']
+        newOrder.computeCost()
         db.session.commit()
     emit('newOrder', orderlist, room=session['rid'], json=True)
     print("finish")
@@ -1183,7 +1330,7 @@ def create_checkout_session(sid, rid):
                     "name": subscription.name,
                     "quantity": 1,
                     "currency": "eur",
-                    "amount": int(subscription.monthlyCost)*100,
+                    "amount": int(subscription.monthlyCost) * 100,
                 }
             ]
         )
@@ -1211,7 +1358,7 @@ def success(sessionId):
     else:
         today = association.last_validity
         lastDay = add_months(today, subscription.duration)
-        association.last_validity =lastDay
+        association.last_validity = lastDay
     db.session.commit()
     return render_template("Subscriptions/result.htm", sessionId=sessionId, mode="success", hidebar=True, invert=True)
 
@@ -1220,7 +1367,7 @@ def add_months(sourcedate, months):
     month = sourcedate.month - 1 + months
     year = sourcedate.year + month // 12
     month = month % 12 + 1
-    day = min(sourcedate.day, calendar.monthrange(year,month)[1])
+    day = min(sourcedate.day, calendar.monthrange(year, month)[1])
     return datetime.date(year, month, day)
 
 
@@ -1229,13 +1376,12 @@ def cancelled():
     return render_template("Subscriptions/result.htm", user=user, mode="fail")
 
 
-#Admin pages
+# Admin pages
 
 @app.route("/admin/add", methods=['POST'])
 @admin_or_403
 def page_admin_add():
     pass
-
 
 
 if __name__ == "__main__":
