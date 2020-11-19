@@ -18,7 +18,9 @@
         let additions = 0;
 
         function genhtml(n, mode) {
-            return "<select id=\"" + mode + n + "\" class=\"browser-default\" name=\"" + mode + n + "\">{% for ingredient in ingredients %}<option value=\"{{ingredient.iid}}\">{{ingredient.name}}</option>{% endfor %}</select>"
+            return "<select id=\"" + mode + n + "\" class=\"browser-default\" name=\"" + mode + n + "\">
+                {% for ingredient in ingredients %}<option value=\"{{ingredient.iid}}\">{{ingredient.name}}
+                    </option>{% endfor %}</select>"
         }
 
         function add(mode) {
@@ -78,29 +80,34 @@
                         <label for="name">{{ gettext("Description") }}</label>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="input-field col s6">
-                        {{ gettext("Ingredients") }}
-                        <div id="composition">
-                            <p>
-                            <div id="add-ingredient" class="btn waves-effect waves-light"
-                                 onclick="add('composition')"><i class="material-icons">add</i></div>
-                            <div id="remove-ingredient" class="btn waves-effect waves-light"
-                                 onclick="remove('composition')"><i class="material-icons">remove</i></div>
-                            </p>
+                {% if plate is undefined %}
+                    <div class="row">
+                        <div class="input-field col s6">
+                            {{ gettext("Ingredients") }}
+                            <div id="composition">
+                                <p>
+                                <div id="add-ingredient" class="btn waves-effect waves-light"
+                                     onclick="add('composition')"><i class="material-icons">add</i></div>
+                                <div id="remove-ingredient" class="btn waves-effect waves-light"
+                                     onclick="remove('composition')"><i class="material-icons">remove</i></div>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="input-field col s6">
+                            {{ gettext("Allowed Additions") }}
+                            <div id="addition">
+                                <p>
+                                <div id="add-addition" class="btn waves-effect waves-light" onclick="add('addition')"><i
+                                        class="material-icons">add</i></div>
+                                <div id="remove-addition" class="btn waves-effect waves-light"
+                                     onclick="remove('addition')"><i class="material-icons">remove</i></div>
+                                </p>
+                            </div>
                         </div>
                     </div>
-                    <div class="input-field col s6">
-                        {{ gettext("Allowed Additions") }}
-                        <div id="addition">
-                            <p>
-                            <div id="add-addition" class="btn waves-effect waves-light" onclick="add('addition')"><i class="material-icons">add</i></div>
-                            <div id="remove-addition" class="btn waves-effect waves-light"
-                                 onclick="remove('addition')"><i class="material-icons">remove</i></div>
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                {% else %}
+                    <a href="/restaurant/{{ rid }}/plate/{{ plate.pid }}/edit/ingredients">{{ gettext("Customize components") }}</a>
+                {% endif %}
                 <div class="row">
                     <div class="input-field col s6">
                         <input type=file name=file id="file">

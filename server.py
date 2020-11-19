@@ -791,7 +791,6 @@ def page_dish_edit(pid, rid):
         return render_template("Menu/Plate/addOrMod.htm", user=user, rid=rid, plate=plate)
     plate.name = request.form.get("name")
     plate.description = request.form.get("description")
-    plate.ingredients = request.form.get("ingredients")
     plate.cost = float(request.form.get("cost"))
     if 'file' in request.files:
         file = request.files['file']
@@ -809,6 +808,44 @@ def page_dish_edit(pid, rid):
             os.remove(path)
     db.session.commit()
     return redirect(url_for("page_restaurant_management", rid=rid))
+
+
+@app.route("/restaurant/<int:rid>/plate/<int:pid>/edit/ingredients", methods=['GET', 'POST'])
+@login_or_403
+def page_plate_customizations(rid, pid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+    plate = Plate.query.get_or_404(pid)
+    if request.method == "GET":
+        availableIngredients = Ingredient.query.filter_by(restaurant_id=rid).all()
+        return render_template("Menu/Plate/inspectComponents.htm", user=user, plate=plate, availableIngredients=availableIngredients, rid=rid)
+    iid = request.form.get('available')
+    mode = request.form.get('mode')
+    ingredient = Ingredient.query.get_or_404(int(iid))
+    if mode == "ingredient":
+        newAssoc = Composition(iid=iid, pid=pid)
+    else:
+        newAssoc = Additions(iid=iid, pid=pid)
+    db.session.add(newAssoc)
+    db.session.commit()
+    return redirect(url_for('page_plate_customizations', pid=pid, rid=rid))
+
+
+@app.route("/restaurant/<int:rid>/plate/<int:pid>/edit/ingredients/<int:iid>/remove/<int:mode>", methods=['GET'])
+def page_plate_customizations_remove(rid, pid, iid, mode):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
+    if not check:
+        abort(403)
+    if mode == 1: # Ingredient
+        obj = Composition.query.filter_by(iid=iid, pid=pid).first()
+    else:
+        obj = Additions.query.filter_by(iid=iid, pid=pid).first()
+    db.session.delete(obj)
+    db.session.commit()
+    return redirect(url_for('page_plate_customizations', pid=pid, rid=rid))
 
 
 @app.route("/restaurant/<int:rid>/ingredient/add", methods=['GET', 'POST'])
@@ -1017,7 +1054,13 @@ def page_table_close(tid):
     for order in table.order:
         if order.costOverride:
             cost = order.costOverride
-            name = order.plate.name + " - " + order.specialReq
+            name = order.plate.name + " - "
+            for element in order.specialReq:
+                stri = "-"
+                if element.mode:
+                    stri = "+"
+                name += "\n   "+stri+" "+element.ingredient.name+" ("+str(element.ingredient.addCost)+"€)"
+                db.session.delete(element)
         else:
             cost = order.plate.cost
             name = order.plate.name
