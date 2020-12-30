@@ -77,8 +77,11 @@
                     </div>
                     {% if user.isAdmin %}
                         <div id="admin" class="col s12" style="background-color:#fafafa; color: #ff6f00">
-                            <h3>{{ gettext("Lorem ipsum?") }}</h3>
-                            <p class="flow-text">{{ gettext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vel suscipit turpis, et maximus ligula. Aenean lacinia odio in consectetur faucibus. Pellentesque tristique sem a lorem facilisis gravida. In ac ipsum auctor, elementum ligula id, mattis orci. Suspendisse semper, quam in hendrerit convallis, felis purus sodales libero, in dictum est augue a mauris. Nam vehicula semper tincidunt. Pellentesque at mauris id dolor faucibus hendrerit eu vitae lacus. Nullam tincidunt posuere facilisis. ") }}</p>
+                        <br>
+                            <a href="/admin/subscription/list" class="btn waves-effect waves-light" type="submit"
+                               name="action">{{ gettext("Subscriptions") }}
+                                <i class="material-icons right">book</i>
+                            </a>
                         </div>
                     {% endif %}
                     <div id="account" class="col s12" style="background-color:#fafafa; color: #ff6f00">

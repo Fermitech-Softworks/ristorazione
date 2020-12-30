@@ -18,9 +18,7 @@
         let additions = 0;
 
         function genhtml(n, mode) {
-            return "<select id=\"" + mode + n + "\" class=\"browser-default\" name=\"" + mode + n + "\">
-                {% for ingredient in ingredients %}<option value=\"{{ingredient.iid}}\">{{ingredient.name}}
-                    </option>{% endfor %}</select>"
+            return "<select id=\"" + mode + n + "\" class=\"browser-default\" name=\"" + mode + n + "\">{% for ingredient in ingredients %}<option value=\"{{ingredient.iid}}\">{{ingredient.name}}</option>{% endfor %}</select>"
         }
 
         function add(mode) {
