@@ -56,6 +56,10 @@ class User(db.Model):
     isAdmin = db.Column(db.Boolean, nullable=False)
     work = db.relationship("Work", back_populates="user", cascade="all, delete")
 
+    def toJson(self, extend=False):
+        return {'email': self.email, 'name': self.name, 'surname': self.surname, 'isAdmin': self.isAdmin,
+                'work': [w.toJson(extend) for w in self.work]}
+
 
 class Restaurant(db.Model):
     __tablename__ = "restaurant"
@@ -75,6 +79,11 @@ class Restaurant(db.Model):
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant", cascade="all, delete")
     orders = db.relationship("Order", back_populates="restaurant", cascade="all, delete")
 
+    def toJson(self, extend=False):
+        return {'rid': self.rid, 'name': self.name, 'city': self.city, 'address': self.address, 'state': self.state,
+                'description': self.description, 'link': self.link, 'work': [w.toJson(extend) for w in self.work],
+                'tax': self.tax, 'sub': [s.toJson(extend) for s in self.sub]}
+
 
 class Work(db.Model):
     __tablename__ = "work"
@@ -83,6 +92,9 @@ class Work(db.Model):
     type = db.Column(db.Integer, nullable=False)
     user = db.relationship("User", back_populates="work")
     restaurant = db.relationship("Restaurant", back_populates="work")
+
+    def toJson(self, extend=False):
+        return {'user': self.user.toJson(self, extend), 'restaurant': self.restaurant.toJson(extend), 'type': self.type}
 
 
 class Subscription(db.Model):
@@ -93,7 +105,12 @@ class Subscription(db.Model):
     monthlyCost = db.Column(db.Float, nullable=False)
     level = db.Column(db.Integer, nullable=False)
     duration = db.Column(db.Integer, nullable=False)  # Number of months
+    enabled = db.Column(db.Boolean, default=True)
     sub = db.relationship("SubscriptionAssociation", back_populates="subscription", cascade="all, delete")
+
+    def toJson(self, extend=False):
+        return {'sid': self.sid, 'name': self.name, 'description': self.name, 'monthlyCost': self.monthlyCost,
+                'level': self.level, 'duration':self.duration, 'enabled':self.enabled, 'sub':[s.toJson(extend) for s in self.sub]}
 
 
 class SubscriptionAssociation(db.Model):
@@ -103,6 +120,10 @@ class SubscriptionAssociation(db.Model):
     restaurant = db.relationship("Restaurant", back_populates="sub")
     subscription = db.relationship("Subscription", back_populates="sub")
     last_validity = db.Column(db.DateTime, nullable=False)
+
+    def toJson(self, extend=False):
+        return {'restaurant': self.restaurant.toJson(extend), 'subscription': self.subscription.toJson(extend),
+                'last_validity': self.last_validity}
 
 
 class Table(db.Model):
@@ -162,7 +183,8 @@ class Plate(db.Model):
 
     def toJson(self):
         return {'pid': self.pid, 'name': self.name, 'description': self.description,
-                'ingredients': [i.toJson() for i in self.ingredients], 'additions': [a.toJson() for a in self.additions],
+                'ingredients': [i.toJson() for i in self.ingredients],
+                'additions': [a.toJson() for a in self.additions],
                 'cost': self.cost, 'link': self.link}
 
 
@@ -229,9 +251,9 @@ class Order(db.Model):
         baseCost = self.plate.cost
         for element in self.specialReq:
             if element.mode:
-                baseCost+=element.ingredient.addCost
+                baseCost += element.ingredient.addCost
             elif self.plate.ifRemovedIngredientsDecreasePrice:
-                baseCost-=element.ingredient.addCost
+                baseCost -= element.ingredient.addCost
         if baseCost != self.plate.cost:
             self.costOverride = baseCost
 
@@ -245,7 +267,7 @@ class Customization(db.Model):
     ingredient = db.relationship("Ingredient", back_populates="customizations")
 
     def toJson(self):
-        return {'mode': self.mode, 'ingredient':self.ingredient.toJson()}
+        return {'mode': self.mode, 'ingredient': self.ingredient.toJson()}
 
 
 class Transaction(db.Model):
@@ -820,7 +842,8 @@ def page_plate_customizations(rid, pid):
     plate = Plate.query.get_or_404(pid)
     if request.method == "GET":
         availableIngredients = Ingredient.query.filter_by(restaurant_id=rid).all()
-        return render_template("Menu/Plate/inspectComponents.htm", user=user, plate=plate, availableIngredients=availableIngredients, rid=rid)
+        return render_template("Menu/Plate/inspectComponents.htm", user=user, plate=plate,
+                               availableIngredients=availableIngredients, rid=rid)
     iid = request.form.get('available')
     mode = request.form.get('mode')
     ingredient = Ingredient.query.get_or_404(int(iid))
@@ -839,7 +862,7 @@ def page_plate_customizations_remove(rid, pid, iid, mode):
     check = Work.query.filter_by(userEmail=user.email, restaurantId=rid, type=UserType.owner).first()
     if not check:
         abort(403)
-    if mode == 1: # Ingredient
+    if mode == 1:  # Ingredient
         obj = Composition.query.filter_by(iid=iid, pid=pid).first()
     else:
         obj = Additions.query.filter_by(iid=iid, pid=pid).first()
@@ -929,7 +952,7 @@ def page_plate_get_additions(pid):
     plate = Plate.query.get_or_404(pid)
     dict = {}
     for a in plate.additions:
-        dict[a.iid]=a.toJson()
+        dict[a.iid] = a.toJson()
     for i in plate.ingredients:
         dict[i.iid] = i.toJson()
     return dict
@@ -940,7 +963,7 @@ def page_plate_get_ingredients(pid):
     plate = Plate.query.get_or_404(pid)
     dict = {}
     for a in plate.ingredients:
-        dict[a.iid]=a.toJson()
+        dict[a.iid] = a.toJson()
     return dict
 
 
@@ -1037,7 +1060,8 @@ def page_order_getPlate(oid):
     cost = order.costOverride
     if not order.costOverride:
         cost = order.plate.cost
-    ans['override'] = {'desc': [i.toJson() for i in order.specialReq], 'cost': cost, 'tid': order.tableId, 'oid': order.oid}
+    ans['override'] = {'desc': [i.toJson() for i in order.specialReq], 'cost': cost, 'tid': order.tableId,
+                       'oid': order.oid}
     return ans
 
 
@@ -1059,8 +1083,9 @@ def page_table_close(tid):
                 stri = "-"
                 if element.mode:
                     stri = "+"
-                name += "\n   "+stri+" "+element.ingredient.name+" ("+str(element.ingredient.addCost)+"€)"
+                name += "\n   " + stri + " " + element.ingredient.name + " (" + str(element.ingredient.addCost) + "€)"
                 db.session.delete(element)
+                db.session.commit()
         else:
             cost = order.plate.cost
             name = order.plate.name
@@ -1068,6 +1093,7 @@ def page_table_close(tid):
                'qty': order.quantity}
         response['orders'].append(tmp)
         db.session.delete(order)
+        db.session.commit()
     table.token = createToken(table)
     db.session.commit()
     return response
@@ -1263,13 +1289,13 @@ def connHandler(rid):
     join_room(rid)
 
 
-@socketio.on('ping')
-def pingHandler(rid):
-    print("Table {} is pinging".format(rid))
-    if 'tid' not in session:
-        return
-    print("Table {} is pinging".format(rid))
-    emit("ping", room=rid)
+# @socketio.on('ping')
+# def pingHandler(rid):
+#    print("Table {} is pinging".format(rid))
+#    if 'tid' not in session:
+#        return
+#    print("Table {} is pinging".format(rid))
+#    emit("ping", room=rid)
 
 
 @socketio.on('disconnectPersonnel')
@@ -1310,9 +1336,10 @@ def orderHandler(json):
             for custom in orderlist[order]['customizations']:
                 mode = True
                 if orderlist[order]['customizations'][custom]['mode'] == "-":
-                    mode=False
-                #TODO: Add a way to check if the ingredient is connected to the plate.
-                newConn = Customization(oid=newOrder.oid, iid=orderlist[order]['customizations'][custom]['iid'], mode=mode)
+                    mode = False
+                # TODO: Add a way to check if the ingredient is connected to the plate.
+                newConn = Customization(oid=newOrder.oid, iid=orderlist[order]['customizations'][custom]['iid'],
+                                        mode=mode)
                 db.session.add(newConn)
         orderlist[order]['data']['oid'] = newOrder.oid
         orderlist[order]['data']['tid'] = session['tid']
@@ -1373,7 +1400,7 @@ def create_checkout_session(sid, rid):
                     "name": subscription.name,
                     "quantity": 1,
                     "currency": "eur",
-                    "amount": int(subscription.monthlyCost) * 100,
+                    "amount": int(subscription.monthlyCost)* subscription.duration * 100,
                 }
             ]
         )
@@ -1421,9 +1448,133 @@ def cancelled():
 
 # Admin pages
 
+@app.route("/admin/subscription/list")
+@admin_or_403
+def page_admin_subscription_list():
+    subscriptions = Subscription.query.all()
+    user = find_user(session['email'])
+    return render_template("Admin/Subscription/list.htm", user=user, subscriptions=subscriptions)
+
+@app.route("/admin/subscription/add", methods=['POST', 'GET'])
+@admin_or_403
+def page_admin_subscription_add():
+    user = find_user(session['email'])
+    if request.method == 'GET':
+        return render_template("Admin/Subscription/addOrMod.htm", user=user)
+    newSubscription = Subscription(name=request.form.get('name'), description=request.form.get('description'),
+                                   monthlyCost=request.form.get('cost'), level=request.form.get('level'),
+                                   duration=request.form.get('duration'), enabled=True)
+    db.session.add(newSubscription)
+    db.session.commit()
+    return redirect(url_for('page_admin_subscription_list'))
+
+
+@app.route("/admin/subscription/edit/<int:sid>", methods=['POST', 'GET'])
+@admin_or_403
+def page_admin_subscription_edit(sid):
+    user = find_user(session['email'])
+    sub = Subscription.query.get_or_404(sid)
+    if request.method == 'GET':
+        return render_template("Admin/Subscription/addOrMod.htm", user=user, sub=sub)
+    sub.name = request.form.get('name')
+    sub.description = request.form.get('description')
+    sub.monthlyCost = request.form.get('cost')
+    sub.level = request.form.get('level')
+    sub.duration = request.form.get('duration')
+    db.session.commit()
+    return redirect(url_for('page_admin_subscription_list'))
+
+
+@app.route("/admin/subscription/toggle/<int:sid>", methods=['GET'])
+@admin_or_403
+def page_admin_subscription_toggle(sid):
+    sub = Subscription.query.get_or_404(sid)
+    sub.enabled = not sub.enabled
+    db.session.commit()
+    return redirect(url_for('page_admin_subscription_list'))
+
+
+@app.route("/admin/subscription/addToRestaurant/<int:rid>", methods=["GET", "POST"])
+@admin_or_403
+def page_subscription_add_restaurant(rid):
+    res = Restaurant.query.get_or_404(rid)
+    user = find_user(session['email'])
+    if request.method == "GET":
+        subs = Subscription.query.all()
+        return render_template("Admin/Subscription/addToRestaurant.htm", user=user, res=res, subs=subs)
+    association = SubscriptionAssociation.query.filter_by(subscriptionId=request.form.get('sid'), restaurantId=rid).first()
+    subscription = Subscription.query.get_or_404(request.form.get('sid'))
+    if not association:
+        today = datetime.date.today()
+        lastDay = add_months(today, subscription.duration)
+        newsub = SubscriptionAssociation(restaurantId=rid, subscriptionId=request.form.get('sid'), last_validity=lastDay)
+        db.session.add(newsub)
+    else:
+        today = association.last_validity
+        lastDay = add_months(today, subscription.duration)
+        association.last_validity = lastDay
+    db.session.commit()
+    return redirect(url_for('page_admin_subscription_list'))
+
+
+@app.route("/admin/subscription/<int:sid>/restaurants")
+def page_subscription_find_restaurants(sid):
+    user = find_user(session['email'])
+    sub = Subscription.query.get_or_404(sid)
+    return render_template("Admin/Restaurant/list.htm", user=user, subscriptions=sub.sub)
+
+
 @app.route("/admin/add", methods=['POST'])
 @admin_or_403
 def page_admin_add():
+    pass
+
+
+@app.route("/admin/list", methods=['GET'])
+@admin_or_403
+def page_admin_list():
+    pass
+
+
+@app.route("/admin/restaurant/new", methods=['POST'])
+@admin_or_403
+def page_admin_restaurant_add():
+    pass
+
+
+@app.route("/admin/restaurant/search/<int:mode>", methods=['POST'])
+@admin_or_403
+def page_admin_restaurant_search(mode):  # 1 - User id, 2 - Name, 3 - subbed
+    pass
+
+
+@app.route("/admin/restaurant/edit/<int:rid>")
+@admin_or_403
+def page_admin_restaurant_edit(rid):
+    pass
+
+
+@app.route("/admin/restaurant/remove/<int:rid>")
+@admin_or_403
+def page_admin_restaurant_remove(rid):
+    pass
+
+
+@app.route("/admin/user/search", methods=['POST'])
+@admin_or_403
+def page_admin_user_search():
+    pass
+
+
+@app.route("/admin/user/edit/<int:rid>", methods=['GET', 'POST'])
+@admin_or_403
+def page_admin_user_edit(rid):
+    pass
+
+
+@app.route("/admin/runquery", methods=['POST'])
+@admin_or_403
+def page_admin_runquery():
     pass
 
 

@@ -1,0 +1,49 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Add/Edit a subscription") }}{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="col s12">
+            <form class="col s12" {% if sub is undefined %}action="/admin/subscription/add" {% else %}
+                  action="/admin/subscription/edit/{{ sub.sid }}" {% endif %} method="POST">
+                <div class="row">
+                    <div class="input-field col s6">
+                        <input id="name" type="text" class="validate" name="name" {% if sub is defined %}
+                               value="{{ sub.name }}" {% endif %}>
+                        <label for="name">{{ gettext("Subscription name") }}</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input id="tax" type="text" class="validate" name="description" {% if sub is defined %}
+                               value="{{ sub.description }}" {% endif %}>
+                        <label for="tax">{{ gettext("Desciption") }}</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s5">
+                        <input id="address" type="text" class="validate" name="cost" {% if sub is defined %}
+                               value="{{ sub.monthlyCost }}" {% endif %}>
+                        <label for="address">{{ gettext("Cost") }}</label>
+                    </div>
+                    <div class="input-field col s4">
+                        <input id="city" type="text" class="validate" name="level" {% if sub is defined %}
+                               value="{{ sub.level }}" {% endif %}>
+                        <label for="city">{{ gettext("Level") }}</label>
+                    </div>
+                    <div class="input-field col s3">
+                        <input id="state" type="text" class="validate" name="duration" {% if sub is defined %}
+                               value="{{ sub.duration }}" {% endif %}>
+                        <label for="state">{{ gettext("Duration") }}</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s6">
+                        <button class="btn waves-effect waves-light" type="submit" onclick="wait()">
+                            {% if restaurant is undefined %}{{ gettext("Create") }}{% else %}
+                                {{ gettext("Update") }}{% endif %}
+                            <i class="material-icons right">send</i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

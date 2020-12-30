@@ -1,0 +1,35 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Subscriptions list") }}{% endblock %}
+{% block content %}
+    <h3>{{ gettext("Current subscriptions") }}</h3>
+    <a href="/admin/subscription/list" class="btn waves-effect waves-light" type="submit"
+       name="action">{{ gettext("Add") }}
+        <i class="material-icons right">add</i>
+    </a>
+    <table class="responsive-table">
+        <thead>
+        <tr>
+            <th>{{ gettext("SID") }}</th>
+            <th>{{ gettext("Name") }}</th>
+            <th>{{ gettext("Cost") }}</th>
+            <th>{{ gettext("Level") }}</th>
+            <th>{{ gettext("Duration") }}</th>
+            <th>{{ gettext("Enabled") }}</th>
+            <th>{{ gettext("Actions") }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for subscription in subscriptions %}
+            <td>{{ subscription.sid }}</td>
+            <td>{{ subscription.name }}</td>
+            <td>{{ subscription.monthlyCost }}</td>
+            <td>{{ subscription.level }}</td>
+            <td>{{ subscription.duration }}</td>
+            <td>{{ subscription.enabled }}</td>
+            <td><a href="/admin/subscription/toggle/{{ subscription.sid }}"><i
+                    class="material-icons right">info_outline</i></a> <a href="/admin/subscription/{{subscription.sid}}/restaurants"><i
+                    class="material-icons right">search</i></a></td>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

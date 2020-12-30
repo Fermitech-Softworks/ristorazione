@@ -1,0 +1,29 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Add a subscription to restaurant") }}{% endblock %}
+{% block content %}
+    <div class="row">
+        <div class="col s12">
+            <form class="col s12"
+                  action="/admin/subscription/addToRestaurant/{{ res.rid }}" method="POST">
+                <div class="row">
+                    <div class="input-field col s12">
+                        <select id="sid" class="browser-default" name="sid">
+                            {% for sub in subs %}
+                                <option value="{{ sub.sid }}">{{ sub.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label for="sid">{{ gettext("Subscription name") }}</label>
+                    </div>
+                    <div class="row">
+                        <div class="input-field col s6">
+                            <button class="btn waves-effect waves-light" type="submit" onclick="wait()">
+                                {% if restaurant is undefined %}{{ gettext("Create") }}{% else %}
+                                    {{ gettext("Update") }}{% endif %}
+                                <i class="material-icons right">send</i>
+                            </button>
+                        </div>
+                    </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Restaurant subscriptions list") }}{% endblock %}
+{% block content %}
+    <h3>{{ gettext("Current active subscriptions") }}</h3>
+    <table class="responsive-table">
+        <thead>
+        <tr>
+            <th>{{ gettext("RID") }}</th>
+            <th>{{ gettext("Name") }}</th>
+            <th>{{ gettext("City") }}</th>
+            <th>{{ gettext("Address") }}</th>
+            <th>{{ gettext("State") }}</th>
+            <th>{{ gettext("Last Date") }}</th>
+            <th>{{ gettext("Actions") }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for subscription in subscriptions %}
+            <td>{{ subscription.restaurant.rid }}</td>
+            <td>{{ subscription.restaurant.name }}</td>
+            <td>{{ subscription.restaurant.city }}</td>
+            <td>{{ subscription.restaurant.state }}</td>
+            <td>{{ subscription.restaurant.address }}</td>
+            <td>{{ subscription.last_validity }}</td>
+            <td><a href=""><i
+                    class="material-icons right">search</i></a></td>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
