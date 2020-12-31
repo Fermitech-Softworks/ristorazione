@@ -10,21 +10,39 @@
             <th>{{ gettext("City") }}</th>
             <th>{{ gettext("Address") }}</th>
             <th>{{ gettext("State") }}</th>
-            <th>{{ gettext("Last Date") }}</th>
+            {% if subscriptions is defined %}
+                <th>{{ gettext("Last Date") }}</th>
+            {% endif %}
             <th>{{ gettext("Actions") }}</th>
         </tr>
         </thead>
         <tbody>
-        {% for subscription in subscriptions %}
-            <td>{{ subscription.restaurant.rid }}</td>
-            <td>{{ subscription.restaurant.name }}</td>
-            <td>{{ subscription.restaurant.city }}</td>
-            <td>{{ subscription.restaurant.state }}</td>
-            <td>{{ subscription.restaurant.address }}</td>
-            <td>{{ subscription.last_validity }}</td>
-            <td><a href=""><i
-                    class="material-icons right">search</i></a></td>
-        {% endfor %}
+        {% if subscriptions is defined %}
+            {% for subscription in subscriptions %}
+                <tr>
+                    <td>{{ subscription.restaurant.rid }}</td>
+                    <td>{{ subscription.restaurant.name }}</td>
+                    <td>{{ subscription.restaurant.city }}</td>
+                    <td>{{ subscription.restaurant.state }}</td>
+                    <td>{{ subscription.restaurant.address }}</td>
+                    <td>{{ subscription.last_validity }}</td>
+                    <td><a href="/admin/restaurant/{{ subscription.restaurant.rid }}/getWorkers"><i
+                            class="material-icons right">search</i></a></td>
+                </tr>
+            {% endfor %}
+        {% else %}
+            {% for restaurant in restaurants %}
+                <tr>
+                    <td>{{ restaurant.rid }}</td>
+                    <td>{{ restaurant.name }}</td>
+                    <td>{{ restaurant.city }}</td>
+                    <td>{{ restaurant.state }}</td>
+                    <td>{{ restaurant.address }}</td>
+                    <td><a href="/admin/restaurant/{{ restaurant.rid }}/getWorkers"><i
+                            class="material-icons right">search</i></a></td>
+                </tr>
+            {% endfor %}
+        {% endif %}
         </tbody>
     </table>
 {% endblock %}

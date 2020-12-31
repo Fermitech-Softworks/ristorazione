@@ -1,0 +1,60 @@
+{% extends "stampo.htm" %}
+{% block title %}{{ gettext("Users list") }}{% endblock %}
+{% block content %}
+    <h3>{{ gettext("User query result") }}</h3>
+    {% if work is undefined %}
+        <h5>{{ gettext("Add an admin") }}</h5>
+        <form class="col s12" action="/admin/add" method="POST">
+            <div class="row">
+                <div class="input-field col s8">
+                    <input id="email" type="text" class="validate" name="email">
+                    <label for="email">Email</label>
+                </div>
+                <div class="input-field col s4">
+                    <button class="btn waves-effect waves-light" type="submit"
+                            name="action">{{ gettext("Submit") }}
+                        <i class="material-icons right">send</i>
+                    </button>
+                </div>
+            </div>
+        </form>
+    {% endif %}
+    <table class="responsive-table">
+        <thead>
+        <tr>
+            <th>{{ gettext("email") }}</th>
+            <th>{{ gettext("name") }}</th>
+            <th>{{ gettext("surname") }}</th>
+            <th>{{ gettext("isAdmin") }}</th>
+            {% if work is defined %}
+                <th>{{ gettext("Role") }}</th>
+            {% endif %}
+            <th>{{ gettext("Actions") }}</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if work is defined %}
+            {% for w in users %}
+                <tr>
+                    <td>{{ w.user.email }}</td>
+                    <td>{{ w.user.name }}</td>
+                    <td>{{ w.user.surname }}</td>
+                    <td>{{ w.user.isAdmin }}</td>
+                    <td>{{ w.type }}</td>
+                    <td></td>
+                </tr>
+            {% endfor %}
+        {% else %}
+            {% for u in users %}
+                <tr>
+                    <td>{{ u.email }}</td>
+                    <td>{{ u.name }}</td>
+                    <td>{{ u.surname }}</td>
+                    <td>{{ u.isAdmin }}</td>
+                    <td></td>
+                </tr>
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+{% endblock %}

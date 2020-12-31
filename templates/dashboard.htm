@@ -77,9 +77,13 @@
                     </div>
                     {% if user.isAdmin %}
                         <div id="admin" class="col s12" style="background-color:#fafafa; color: #ff6f00">
-                        <br>
+                            <br>
                             <a href="/admin/subscription/list" class="btn waves-effect waves-light" type="submit"
                                name="action">{{ gettext("Subscriptions") }}
+                                <i class="material-icons right">book</i>
+                            </a>
+                            <a href="/admin/list" class="btn waves-effect waves-light" type="submit"
+                               name="action">{{ gettext("Admins") }}
                                 <i class="material-icons right">book</i>
                             </a>
                         </div>
