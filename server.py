@@ -70,6 +70,8 @@ class Restaurant(db.Model):
     state = db.Column(db.String)
     description = db.Column(db.String)
     link = db.Column(db.String)
+    stripePublic = db.Column(db.String)
+    stripePrivate = db.Column(db.String)
     work = db.relationship("Work", back_populates="restaurant", cascade="all, delete")
     menus = db.relationship("MenuAssociation", back_populates="restaurant", cascade="all, delete")
     ownedPlates = db.relationship("Plate", back_populates="restaurant", cascade="all, delete")
@@ -80,11 +82,20 @@ class Restaurant(db.Model):
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant", cascade="all, delete")
     orders = db.relationship("Order", back_populates="restaurant", cascade="all, delete")
     timeSlots = db.relationship("RestaurantTimeSlot", back_populates="restaurant", cascade="all, delete")
+    settings = db.relationship("RestaurantSettings", back_populates="restaurant", cascade="all, delete")
 
     def toJson(self, extend=False):
         return {'rid': self.rid, 'name': self.name, 'city': self.city, 'address': self.address, 'state': self.state,
                 'description': self.description, 'link': self.link, 'work': [w.toJson(extend) for w in self.work],
                 'tax': self.tax, 'sub': [s.toJson(extend) for s in self.sub]}
+
+
+class RestaurantSettings(db.Model):
+    __tablename__ = "restaurantSettings"
+    rid = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), primary_key=True)
+    orderManagementEnabled = db.Column(db.Boolean, default=True)
+    takeAwaysEnabled = db.Column(db.Boolean, default=True)
+    restaurant = db.relationship("Restaurant", back_populates="settings")
 
 
 class Work(db.Model):
@@ -287,7 +298,7 @@ class TakeAwayOrder(db.Model):
     completed = db.Column(db.Boolean, nullable=False)
     restaurant = db.relationship("Restaurant", back_populates="takeAways")
     timeSlot = db.relationship("RestaurantTimeSlot", back_populates="takeAways")
-    orders = db.relationship("Order", back_populates="takeAwayOrder")
+    orders = db.relationship("Order", back_populates="takeAwayOrder", cascade="all, delete")
 
 
 class RestaurantTimeSlot(db.Model):
@@ -307,6 +318,7 @@ class TakeAwayTransaction(db.Model):
     taid = db.Column(db.Integer, db.ForeignKey("takeAwayOrder.taid"), primary_key=True)
     paid = db.Column(db.Boolean, default=False)
     amount = db.Column(db.Float, nullable=False)
+    date = db.Column(db.DateTime, default=datetime.date.today())
 
 
 class Transaction(db.Model):
@@ -315,6 +327,7 @@ class Transaction(db.Model):
     sid = db.Column(db.Integer, primary_key=True)
     rid = db.Column(db.Integer, primary_key=True)
     enabled = db.Column(db.Boolean, default=True)
+    date = db.Column(db.DateTime, default=datetime.date.today())
 
 
 # UTILITIES
@@ -560,7 +573,9 @@ def page_restaurant_add():
         t.token = token
         db.session.add(t)
     newWork = Work(userEmail=user.email, restaurantId=newRestaurant.rid, type=UserType.owner)
+    newSettings = RestaurantSettings(rid=newRestaurant.rid, takeAwaysEnabled=False, orderManagementEnabled=False)
     db.session.add(newWork)
+    db.session.add(newSettings)
     db.session.commit()
     return redirect(url_for('page_dashboard'))
 
@@ -603,8 +618,9 @@ def page_restaurant_edit(rid):
 @app.route("/restaurant/<int:rid>/info", methods=['GET', 'POST'])
 def page_restaurant_info(rid):
     restaurant = Restaurant.query.get_or_404(rid)
+    check = restaurant.sub and restaurant.sub[0].last_validity > datetime.datetime.today()
     return render_template("Restaurant/info.htm", restaurant=restaurant, address=urllib.parse.quote(restaurant.address),
-                           state=urllib.parse.quote(restaurant.state), city=urllib.parse.quote(restaurant.city))
+                           state=urllib.parse.quote(restaurant.state), city=urllib.parse.quote(restaurant.city), check=check)
 
 
 @app.route("/restaurant/<int:rid>/management", methods=['GET'])  # Needs a frontend!
@@ -616,7 +632,25 @@ def page_restaurant_management(rid):
         abort(403)
         return
     data = Restaurant.query.filter_by(rid=rid).first()
-    return render_template("Restaurant/management.htm", data=data, user=user)
+    check = data.sub and data.sub[0].last_validity > datetime.datetime.today()
+    return render_template("Restaurant/management.htm", data=data, user=user, check = check)
+
+
+@app.route("/restaurant/<int:rid>/updateSettings", methods=['POST'])
+@login_or_403
+def page_restaurant_updateSettings(rid):
+    user = find_user(session['email'])
+    check = Work.query.filter_by(restaurantId=rid, userEmail=user.email).first()
+    data = Restaurant.query.filter_by(rid=rid).first()
+    check2 = data.sub and data.sub[0].last_validity > datetime.datetime.today()
+    if not check or not check2:
+        abort(403)
+        return
+    settings = RestaurantSettings.query.get_or_404(rid)
+    settings.takeAwaysEnabled = 'takeAway' in request.form
+    settings.orderManagementEnabled = 'orderManagement' in request.form
+    db.session.commit()
+    return redirect(url_for("page_restaurant_management", rid=rid))
 
 
 @app.route("/restaurant/<int:rid>/add_waiterOrOwner/<int:mode>", methods=['POST'])
@@ -1637,11 +1671,22 @@ if __name__ == "__main__":
     db.create_all()
     user = User.query.filter_by(isAdmin=True).all()
     if len(user) == 0:
-        p = bytes("password", encoding="utf-8")
+        p = bytes("prova", encoding="utf-8")
         ash = bcrypt.hashpw(p, bcrypt.gensalt())
-        newUser = User(email="lorenzo.balugani@gmail.com", name="Lorenzo", surname="Balugani", isAdmin=True,
+        newUser = User(email="prova", name="Lorenzo", surname="Balugani", isAdmin=True,
                        password=ash)
         db.session.add(newUser)
+        print("Salting the test user...")
+        newRestaurant = Restaurant(name="Test Restaurant", city="Modena", state="Italy", address="Via Emilia",
+                                   description="Restaurant that only exists for testing purposes", tax=1)
+        db.session.add(newRestaurant)
+        print("Cutting the test restaurant...")
         db.session.commit()
+        db.session.add(Work(restaurantId=newRestaurant.rid, userEmail=newUser.email, type=UserType.owner))
+        db.session.add(Table(restaurantId=newRestaurant.rid, token="sos", tid=0))
+        db.session.add(RestaurantSettings(rid=newRestaurant.rid))
+        print("Boiling test restaurant dependencies...")
+        db.session.commit()
+        print("Checking DB taste...")
     print("The db is delicious!")
     socketio.run(app, debug=True, host='0.0.0.0')
