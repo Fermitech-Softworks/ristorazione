@@ -76,8 +76,10 @@ class Restaurant(db.Model):
     ownedIngredients = db.relationship("Ingredient", back_populates="restaurant", cascade="all, delete")
     tax = db.Column(db.Float, nullable=False)
     tables = db.relationship("Table", back_populates="restaurant", cascade="all, delete")
+    takeAways = db.relationship("TakeAwayOrder", back_populates="restaurant", cascade="all, delete")
     sub = db.relationship("SubscriptionAssociation", back_populates="restaurant", cascade="all, delete")
     orders = db.relationship("Order", back_populates="restaurant", cascade="all, delete")
+    timeSlots = db.relationship("RestaurantTimeSlot", back_populates="restaurant", cascade="all, delete")
 
     def toJson(self, extend=False):
         return {'rid': self.rid, 'name': self.name, 'city': self.city, 'address': self.address, 'state': self.state,
@@ -110,7 +112,8 @@ class Subscription(db.Model):
 
     def toJson(self, extend=False):
         return {'sid': self.sid, 'name': self.name, 'description': self.name, 'monthlyCost': self.monthlyCost,
-                'level': self.level, 'duration':self.duration, 'enabled':self.enabled, 'sub':[s.toJson(extend) for s in self.sub]}
+                'level': self.level, 'duration': self.duration, 'enabled': self.enabled,
+                'sub': [s.toJson(extend) for s in self.sub]}
 
 
 class SubscriptionAssociation(db.Model):
@@ -237,7 +240,7 @@ class Order(db.Model):
     __tablename__ = "order"
     oid = db.Column(db.Integer, primary_key=True, autoincrement=True)
     restaurantId = db.Column(db.Integer, db.ForeignKey('restaurant.rid'), nullable=False)
-    tableId = db.Column(db.Integer, db.ForeignKey('table.tid'), nullable=False)
+    tableId = db.Column(db.Integer, db.ForeignKey('table.tid'))
     plateId = db.Column(db.Integer, db.ForeignKey('plate.pid'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     status = db.Column(db.Integer, nullable=False, default=0)
@@ -246,6 +249,10 @@ class Order(db.Model):
     restaurant = db.relationship("Restaurant", back_populates="orders")
     specialReq = db.relationship("Customization")
     costOverride = db.Column(db.Float)
+    isTakeAway = db.Column(db.Boolean, default=False)
+    taid = db.Column(db.Integer, db.ForeignKey("takeAwayOrder.taid"))
+    takeAwayOrder = db.relationship("TakeAwayOrder", back_populates="orders")
+
 
     def computeCost(self):
         baseCost = self.plate.cost
@@ -268,6 +275,38 @@ class Customization(db.Model):
 
     def toJson(self):
         return {'mode': self.mode, 'ingredient': self.ingredient.toJson()}
+
+
+class TakeAwayOrder(db.Model):
+    __tablename__ = "takeAwayOrder"
+    taid = db.Column(db.Integer, primary_key=True)
+    rid = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
+    tsid = db.Column(db.Integer, db.ForeignKey("restaurantTimeSlot.tsid"), nullable=False)
+    refName = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, nullable=False)
+    completed = db.Column(db.Boolean, nullable=False)
+    restaurant = db.relationship("Restaurant", back_populates="takeAways")
+    timeSlot = db.relationship("RestaurantTimeSlot", back_populates="takeAways")
+    orders = db.relationship("Order", back_populates="takeAwayOrder")
+
+
+class RestaurantTimeSlot(db.Model):
+    __tablename__ = "restaurantTimeSlot"
+    tsid = db.Column(db.Integer, primary_key=True)
+    rid = db.Column(db.Integer, db.ForeignKey("restaurant.rid"), nullable=False)
+    upper = db.Column(db.Time, nullable=False)
+    lower = db.Column(db.Time, nullable=False)
+    enabled = db.Column(db.Boolean, default=True)
+    restaurant = db.relationship("Restaurant", back_populates="timeSlots")
+    takeAways = db.relationship("TakeAwayOrder", back_populates="timeSlot")
+
+
+class TakeAwayTransaction(db.Model):
+    __tablename__ = "takeAwayTransaction"
+    paymentId = db.Column(db.String, primary_key=True)
+    taid = db.Column(db.Integer, db.ForeignKey("takeAwayOrder.taid"), primary_key=True)
+    paid = db.Column(db.Boolean, default=False)
+    amount = db.Column(db.Float, nullable=False)
 
 
 class Transaction(db.Model):
@@ -990,9 +1029,9 @@ def page_restaurant_tables(rid):
     if not check or check.type < UserType.waiter:
         abort(403)
     tables = Table.query.filter_by(restaurantId=rid).all()
-    orders_pending = Order.query.filter_by(restaurantId=rid, status=OrderType.submitted).all()
-    orders_tbd = Order.query.filter_by(restaurantId=rid, status=OrderType.accepted).all()
-    orders_complete = Order.query.filter_by(restaurantId=rid, status=OrderType.delivered).all()
+    orders_pending = Order.query.filter_by(restaurantId=rid, status=OrderType.submitted, isTakeAway=False).all()
+    orders_tbd = Order.query.filter_by(restaurantId=rid, status=OrderType.accepted, isTakeAway=False).all()
+    orders_complete = Order.query.filter_by(restaurantId=rid, status=OrderType.delivered, isTakeAway=False).all()
     return render_template("Restaurant/tables.htm", user=user, tables=tables, rid=rid, op=orders_pending, ot=orders_tbd,
                            oc=orders_complete)
 
@@ -1122,7 +1161,7 @@ def page_orders_dashboard(rid):
                                                          token=session['token']).first():
         return redirect(url_for('page_restaurant_info', rid=rid))
     menus = Menu.query.join(MenuAssociation).filter(MenuAssociation.restaurantId == rid, Menu.enabled == True).all()
-    orders = Order.query.filter_by(restaurantId=rid, tableId=session['tid']).all()
+    orders = Order.query.filter_by(restaurantId=rid, tableId=session['tid'], isTakeAway=False).all()
     return render_template("Orders/dashboard.htm", menus=menus, orders=orders, tid=session['tid'], rid=rid)
 
 
@@ -1306,6 +1345,11 @@ def disconnHandler(rid):
     print("User {} has disconnected from room {}.".format(user.email, rid))
 
 
+@socketio.on('newTakeAway') # handler for take away orders. - WIP
+def takeAwayHandler(json):
+    pass
+
+
 @socketio.on('newOrder')
 def orderHandler(json):
     print("start")
@@ -1400,7 +1444,7 @@ def create_checkout_session(sid, rid):
                     "name": subscription.name,
                     "quantity": 1,
                     "currency": "eur",
-                    "amount": int(subscription.monthlyCost)* subscription.duration * 100,
+                    "amount": int(subscription.monthlyCost) * subscription.duration * 100,
                 }
             ]
         )
@@ -1455,6 +1499,7 @@ def page_admin_subscription_list():
     user = find_user(session['email'])
     return render_template("Admin/Subscription/list.htm", user=user, subscriptions=subscriptions)
 
+
 @app.route("/admin/subscription/add", methods=['POST', 'GET'])
 @admin_or_403
 def page_admin_subscription_add():
@@ -1502,12 +1547,14 @@ def page_subscription_add_restaurant(rid):
     if request.method == "GET":
         subs = Subscription.query.all()
         return render_template("Admin/Subscription/addToRestaurant.htm", user=user, res=res, subs=subs)
-    association = SubscriptionAssociation.query.filter_by(subscriptionId=request.form.get('sid'), restaurantId=rid).first()
+    association = SubscriptionAssociation.query.filter_by(subscriptionId=request.form.get('sid'),
+                                                          restaurantId=rid).first()
     subscription = Subscription.query.get_or_404(request.form.get('sid'))
     if not association:
         today = datetime.date.today()
         lastDay = add_months(today, subscription.duration)
-        newsub = SubscriptionAssociation(restaurantId=rid, subscriptionId=request.form.get('sid'), last_validity=lastDay)
+        newsub = SubscriptionAssociation(restaurantId=rid, subscriptionId=request.form.get('sid'),
+                                         last_validity=lastDay)
         db.session.add(newsub)
     else:
         today = association.last_validity
@@ -1527,37 +1574,43 @@ def page_subscription_find_restaurants(sid):
 @app.route("/admin/add", methods=['POST'])
 @admin_or_403
 def page_admin_add():
-    pass
+    user = find_user(request.form.get("email"))
+    user.isAdmin = True
+    db.session.commit()
+    return redirect(url_for("page_admin_list"))
 
 
 @app.route("/admin/list", methods=['GET'])
 @admin_or_403
 def page_admin_list():
-    pass
+    user = find_user(session['email'])
+    admins = User.query.filter_by(isAdmin=True).all()
+    return render_template("Admin/User/list.htm", user=user, users=admins)
 
 
-@app.route("/admin/restaurant/new", methods=['POST'])
+@app.route("/admin/restaurant/list")
 @admin_or_403
-def page_admin_restaurant_add():
-    pass
+def page_admin_restaurant_list():
+    user = find_user(session['email'])
+    restaurants = Restaurant.query.all()
+    return render_template("Admin/Restaurant/list.htm", user=user,restaurants=restaurants)
 
 
-@app.route("/admin/restaurant/search/<int:mode>", methods=['POST'])
+@app.route("/admin/restaurant/<int:rid>/details")
 @admin_or_403
-def page_admin_restaurant_search(mode):  # 1 - User id, 2 - Name, 3 - subbed
-    pass
+def page_admin_restaurant_details(rid):
+    user = find_user(session['email'])
+    restaurant = Restaurant.query.get_or_404(rid)
+    payments = Transaction.query.filter_by(rid=rid).all()
+    return render_template("Admin/Restaurant/details.htm", user=user, payments=payments, restaurant=restaurant)
 
 
-@app.route("/admin/restaurant/edit/<int:rid>")
+@app.route("/admin/restaurant/<int:rid>/getWorkers", methods=['GET'])
 @admin_or_403
-def page_admin_restaurant_edit(rid):
-    pass
-
-
-@app.route("/admin/restaurant/remove/<int:rid>")
-@admin_or_403
-def page_admin_restaurant_remove(rid):
-    pass
+def page_admin_restaurant_workers(rid):
+    user = find_user(session['email'])
+    workers = Work.query.filter_by(restaurantId=rid).all()
+    return render_template("Admin/User/list.htm", user=user, users=workers, work=True)
 
 
 @app.route("/admin/user/search", methods=['POST'])
