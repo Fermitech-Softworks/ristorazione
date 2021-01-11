@@ -197,3 +197,11 @@ html {
     background-color: #fbc02d;
     color: #fff;
 }
+
+.switch label input[type=checkbox]:checked+.lever {
+    background-color: #ff6f00;
+}
+
+.switch label input[type=checkbox]:checked+.lever:after {
+    background-color: #ff6f00;
+}

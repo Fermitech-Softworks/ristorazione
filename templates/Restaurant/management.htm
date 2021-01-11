@@ -296,6 +296,41 @@
                         <a href="/delete/{{ data.rid }}/{{ data.rid }}/restaurant/0">{{ gettext("click here.") }}</a>
                     </p>
                     <hr>
+                    <form class="col s12" action="/restaurant/{{ data.rid }}/updateSettings" method="POST">
+                        <div class="row">
+                            {{ data.settings.rid }}
+                            <div class="input-field col s12">
+                                <div class="switch">
+                                    <label>
+                                        Disable order management
+                                        <input {% if not check %} disabled {% endif %} type="checkbox"
+                                                                  name="orderManagement" id="orderManagement"
+                                                                  {% if data.settings[0].orderManagementEnabled is sameas true%}checked{% endif %}>
+                                        <span class=" lever"></span>
+                                        Enable order management
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="input-field col s12">
+                                <div class="switch">
+                                    <label>
+                                        Disable take-away support
+                                        <input {% if not check %} disabled {% endif %} type="checkbox"
+                                                                  name="takeAway" id="takeAway"
+                                                                  {% if data.settings[0].takeAwaysEnabled is sameas true %}checked{% endif %}>
+                                        <span class="lever"></span>
+                                        Enable take-away support
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="input-field col s12">
+                                <button class="btn waves-effect waves-light" type="submit"
+                                        name="action">
+                                    {{ gettext("Update") }}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                     <a href="/restaurant/{{ data.rid }}/subscription/select"
                        class="btn waves-effect waves-light">{{ gettext("Browse the subscription plans") }}</a>
                     <table>
