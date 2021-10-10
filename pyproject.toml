@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "ristorazione"
+version = "0.1.0"
+description = ""
+authors = ["Nemesis <lorenzo.balugani@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "^0.68.1"
+uvicorn = "^0.15.0"
+psycopg2-binary = "^2.9.1"
+requests = "^2.26.0"
+SQLAlchemy = "^1.4.25"
+aiofiles = "^0.7.0"
+passlib = "^1.7.4"
+bcrypt = "^3.2.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
